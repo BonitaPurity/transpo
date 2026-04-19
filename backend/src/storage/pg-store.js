@@ -13,7 +13,11 @@ function checksumForRecords(records) {
 
 function advisoryKey64(entity) {
   const hex = crypto.createHash('md5').update(String(entity)).digest('hex').slice(0, 16);
-  return BigInt(`0x${hex}`).toString();
+  const unsigned = BigInt(`0x${hex}`);
+  const maxSigned = (1n << 63n) - 1n;
+  const maxUnsigned = (1n << 64n) - 1n;
+  const signed = unsigned > maxSigned ? (unsigned - (maxUnsigned + 1n)) : unsigned;
+  return signed.toString();
 }
 
 class PgStore {
