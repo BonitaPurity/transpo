@@ -1,7 +1,3 @@
-databases:
-  - name: transpo-db
-    plan: free
-
 services:
   - type: web
     name: transpo-backend
@@ -13,9 +9,15 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: DB_MODE
+        value: postgres
       - key: DATABASE_URL
-        fromDatabase:
-          name: transpo-db
-          property: connectionString
+        sync: false
+      - key: DATABASE_SSL
+        value: "true"
+      - key: DATABASE_SSL_REJECT_UNAUTHORIZED
+        value: "false"
+      - key: CORS_ORIGINS
+        value: "https://bap-ex4jv8qge-bonitapurity-5527s-projects.vercel.app"
       - key: JWT_SECRET
         generateValue: true
