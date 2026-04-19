@@ -1,0 +1,20 @@
+ALTER TABLE deliveries
+  ADD COLUMN IF NOT EXISTS "userId" INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS "feeAmount" INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS "paymentStatus" TEXT NOT NULL DEFAULT 'Pending';
+
+CREATE TABLE IF NOT EXISTS delivery_contacts (
+  id SERIAL PRIMARY KEY,
+  "deliveryId" TEXT NOT NULL REFERENCES deliveries(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  phone TEXT NOT NULL,
+  "createdAt" TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_delivery_contacts_delivery ON delivery_contacts ("deliveryId");
+
+CREATE TABLE IF NOT EXISTS delivery_fees (
+  "busId" TEXT PRIMARY KEY REFERENCES buses(id) ON DELETE CASCADE,
+  "feeAmount" INTEGER NOT NULL,
+  "updatedAt" TIMESTAMP NOT NULL DEFAULT NOW()
+);

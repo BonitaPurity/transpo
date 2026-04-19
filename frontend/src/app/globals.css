@@ -1,0 +1,147 @@
+@import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
+
+:root {
+  --background: #ffffff;
+  --foreground: #000000;
+  --primary: #facc15; /* Yellow-400 */
+  --primary-dark: #eab308; /* Yellow-500 */
+  --accent: #000000;
+  --card: #ffffff;
+  --border: #e5e7eb;
+}
+
+[data-theme='dark'] {
+  --background: #000000;
+  --foreground: #facc15;
+  --card: #111111;
+  --border: #262626;
+}
+
+body {
+  color: #000000;
+  background: #ffffff;
+  font-family: 'Geist', sans-serif;
+  overflow-x: hidden;
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
+}
+
+[data-theme='dark'] body {
+  color: #facc15;
+  background: #000000;
+}
+
+@layer components {
+  .card-premium {
+    background-color: var(--card);
+    border: 3px solid #000000;
+    border-radius: 1rem;
+    padding: 1.5rem;
+    box-shadow: 8px 8px 0px 0px #000000;
+    transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  }
+
+  .card-premium:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: 12px 12px 0px 0px #000000;
+  }
+
+  .sidebar-link {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem 1.25rem;
+    border-radius: 0.75rem;
+    color: #ffffff;
+    text-decoration: none;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    transition: all 0.2s ease;
+  }
+
+  .sidebar-link:hover {
+    background-color: #facc15;
+    color: #000000;
+  }
+
+  .sidebar-link-active {
+    background-color: #facc15;
+    color: #000000;
+    box-shadow: 4px 4px 0px 0px #000000;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 10px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(250, 204, 21, 0.35);
+    border-radius: 999px;
+    border: 2px solid rgba(0, 0, 0, 0.8);
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(250, 204, 21, 0.55);
+  }
+
+
+  .btn-yellow {
+    background-color: #facc15;
+    color: #000000;
+    font-weight: 900;
+    padding: 1rem 2rem;
+    border: 3px solid #000000;
+    border-radius: 0.75rem;
+    box-shadow: 4px 4px 0px 0px #000000;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    transition: all 0.1s active;
+  }
+
+  .btn-yellow:active {
+    transform: translate(2px, 2px);
+    box-shadow: 0px 0px 0px 0px #000000;
+  }
+}
+
+.label-small {
+  font-size: 0.7rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  color: #000000;
+  margin-bottom: 0.25rem;
+  display: block;
+}
+
+.shimmer {
+  background: linear-gradient(to right, #f6f7f8 0%, #edeef1 20%, #f6f7f8 40%, #f6f7f8 100%);
+  background-size: 200% 100%;
+  animation: shimmer 2s linear infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 10px;
+}
+::-webkit-scrollbar-track {
+  background: #000000;
+}
+::-webkit-scrollbar-thumb {
+  background: #facc15;
+  border: 2px solid #000000;
+}
