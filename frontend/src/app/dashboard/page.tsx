@@ -367,13 +367,13 @@ export default function Dashboard() {
                  </div>
                  
                  {nextTrip ? (
-                   <div className="flex flex-col md:flex-row items-center gap-10">
-                      <div className="space-y-1">
+                   <div className="flex flex-col md:flex-row items-center gap-10 overflow-hidden">
+                      <div className="space-y-1 overflow-hidden">
                          <div className="text-[10px] font-black uppercase opacity-40">Destination</div>
-                         <div className="text-4xl font-black uppercase tracking-tighter italic">{nextTrip.destination}</div>
+                         <div className="text-4xl font-black uppercase tracking-tighter italic truncate max-w-[200px] sm:max-w-[300px]">{nextTrip.destination}</div>
                       </div>
-                      <div className="w-px h-12 bg-zinc-800 hidden md:block" />
-                      <div className="space-y-1">
+                      <div className="w-px h-12 bg-zinc-800 hidden md:block shrink-0" />
+                      <div className="space-y-1 shrink-0">
                          <div className="text-[10px] font-black uppercase opacity-40">Departure</div>
                          <div className="text-2xl font-black">{nextTrip.departureTime}</div>
                       </div>
@@ -495,27 +495,29 @@ export default function Dashboard() {
                   }`}
                   onClick={() => openBooking(dep)}
                 >
-                  <div className="flex items-center gap-8 flex-1 w-full p-4">
+                  <div className="flex items-center gap-8 flex-1 w-full p-4 overflow-hidden">
                     <div className="w-20 h-20 bg-yellow-400 border-4 border-black rounded-[24px] flex flex-col items-center justify-center shrink-0 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
                       <span className="text-[10px] font-black uppercase tracking-widest">ID</span>
                       <span className="text-2xl font-black leading-none">#{dep.scheduleId.split('_')[1]}</span>
                     </div>
-                    <div className="flex-1 space-y-2">
-                      <div className="flex items-center gap-4">
-                        <span className="text-[10px] font-black px-3 py-1.5 bg-black text-yellow-400 rounded-md uppercase tracking-tighter">
+                    <div className="flex-1 space-y-2 overflow-hidden">
+                      <div className="flex items-center gap-4 flex-wrap">
+                        <span className="text-[10px] font-black px-3 py-1.5 bg-black text-yellow-400 rounded-md uppercase tracking-tighter shrink-0">
                           {dep.busType}
                         </span>
-                        <span className="text-[10px] font-black uppercase flex items-center gap-2 text-black">
-                           <div className="w-2 h-2 bg-black rounded-full" /> Bus {dep.busTag}
+                        <span className="text-[10px] font-black uppercase flex items-center gap-2 text-black truncate">
+                           <div className="w-2 h-2 bg-black rounded-full shrink-0" /> Bus {dep.busTag}
                         </span>
-                        <span className={`text-[10px] font-black uppercase flex items-center gap-2 ${
+                        <span className={`text-[10px] font-black uppercase flex items-center gap-2 shrink-0 ${
                           dep.isSoldOut ? 'text-red-600' : 'text-green-600'
                         }`}>
-                           <div className="w-2 h-2 bg-current rounded-full" /> {dep.isSoldOut ? 'Sold Out' : `${dep.seatsAvailable}/${dep.seatCapacity} Seats`}
+                           <div className={`w-2 h-2 rounded-full ${dep.isSoldOut ? 'bg-red-600' : 'bg-green-600 animate-pulse'}`} /> {dep.isSoldOut ? 'Sold Out' : `${dep.seatsAvailable}/${dep.seatCapacity} Seats`}
                         </span>
                       </div>
-                      <div className="text-4xl font-black tracking-tighter flex items-center gap-4 flex-wrap">
-                        {dep.departureTime} <ArrowRight className="w-10 h-10 text-zinc-300" /> {dep.destination}
+                      <div className="text-4xl font-black tracking-tighter flex items-center gap-4 flex-wrap overflow-hidden">
+                        <span className="shrink-0">{dep.departureTime}</span>
+                        <ArrowRight className="w-10 h-10 text-zinc-300 shrink-0" />
+                        <span className="truncate max-w-[140px] sm:max-w-[200px]">{dep.destination}</span>
                       </div>
                     </div>
                   </div>

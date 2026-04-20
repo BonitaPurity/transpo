@@ -104,23 +104,23 @@ export default function AdminOverview() {
       </header>
 
       {/* KPI Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         {STAT_CARDS.map((s, i) => (
           <motion.div
             key={s.label}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.08 }}
-            className="bg-zinc-800/60 border border-zinc-700 rounded-3xl p-6 space-y-4 hover:border-yellow-400/40 transition-all"
+            className="bg-zinc-800/60 border border-zinc-700 rounded-3xl p-6 space-y-4 hover:border-yellow-400/40 transition-all flex flex-col justify-between"
           >
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-black uppercase tracking-widest text-white/40">{s.label}</span>
-              <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: `${s.color}22` }}>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[10px] font-black uppercase tracking-widest text-white/40 truncate">{s.label}</span>
+              <div className="w-9 h-9 shrink-0 rounded-xl flex items-center justify-center" style={{ background: `${s.color}22` }}>
                 <s.icon className="w-4 h-4" style={{ color: s.color }} />
               </div>
             </div>
-            <div className="text-4xl font-black tracking-tighter" style={{ color: s.color }}>{loading ? '...' : s.value}</div>
-            <div className="text-[10px] font-bold text-white/30 uppercase">{s.sub}</div>
+            <div className="text-3xl xl:text-4xl font-black tracking-tighter truncate" style={{ color: s.color }}>{loading ? '...' : s.value}</div>
+            <div className="text-[10px] font-bold text-white/30 uppercase truncate">{s.sub}</div>
           </motion.div>
         ))}
       </div>

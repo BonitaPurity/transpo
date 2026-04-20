@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { MapPin, Zap, Radio, Settings, Plus, X } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { apiService } from '@/services/api';
@@ -340,187 +340,150 @@ export default function AdminFleet() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
         {isLoading ? (
           <div className="text-white/50">Loading fleet…</div>
         ) : (
-          (fleetByHub || []).map((bus, i) => {
-            const color = colorFromHub(bus.hubId);
-            const isEditing = editingId === bus.id;
-
-            return (
-              <motion.div
-                key={bus.id}
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: i * 0.05 }}
-                className="bg-zinc-800/60 border border-zinc-700 rounded-2xl p-6 space-y-4 hover:border-zinc-500 transition-all"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <Radio className="w-5 h-5" style={{ color }} />
-                    <span className="font-black text-white uppercase tracking-wider">{bus.tag}</span>
+          (fleetByHub || []).map((bus) => (
+            <motion.div
+              key={bus.id}
+              layout
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="bg-zinc-800/60 border border-zinc-700 rounded-3xl p-6 space-y-4 hover:border-yellow-400/40 transition-all group relative"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-yellow-400 flex items-center justify-center border-2 border-black rotate-2 group-hover:rotate-6 transition-transform">
+                    <Zap className="w-5 h-5 text-black" />
                   </div>
-                  <button
+                  <div>
+                    <div className="text-xl font-black tracking-tighter text-yellow-400 truncate max-w-[120px]">{bus.tag}</div>
+                    <div className="text-[10px] font-bold text-white/30 uppercase truncate max-w-[120px]">{bus.destination}</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${
+                    bus.status === 'Active' ? 'bg-green-500/10 text-green-400 border border-green-500/20' :
+                    bus.status === 'En Route' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' :
+                    'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                  }`}>
+                    {bus.status}
+                  </div>
+                  <button 
                     onClick={() => {
-                      if (isEditing) {
-                        setEditingId(null);
-                      } else {
-                        setEditingId(bus.id);
-                        setEditingValues({
-                          gpsLat: bus.gpsLat || 0,
-                          gpsLng: bus.gpsLng || 0,
-                          speed: bus.speed || 0,
-                          battery: bus.battery || 0,
-                          status: bus.status || 'Active',
-                          destination: bus.destination || '',
-                          seatCapacity: bus.seatCapacity ?? 45,
-                        });
-                      }
+                      setEditingId(bus.id);
+                      setEditingValues({
+                        gpsLat: bus.gpsLat,
+                        gpsLng: bus.gpsLng,
+                        speed: bus.speed,
+                        battery: bus.battery,
+                        status: bus.status
+                      });
                     }}
-                    className="p-2 rounded-lg hover:bg-zinc-700 transition-all"
+                    className="p-2 hover:bg-zinc-700 rounded-xl transition-colors text-white/40 hover:text-white"
                   >
-                    <Settings className="w-3.5 h-3.5 text-white/30" />
+                    <Settings className="w-4 h-4" />
                   </button>
                 </div>
+              </div>
 
-                <div className="flex items-center gap-2 text-xs font-bold text-white/40">
-                  <MapPin className="w-3.5 h-3.5" style={{ color }} />
-                  <span className="text-white/80">→ {bus.destination || '—'}</span>
-                </div>
-                <div className="text-[9px] font-black uppercase text-white/30">
-                  Capacity: {bus.seatCapacity ?? 45} · {bus.approved === false ? 'Unapproved' : 'Approved'}
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <div className="text-[9px] font-black uppercase text-white/30 mb-1">Speed</div>
-                    <div className="flex items-center gap-1">
-                      <Zap className="w-3 h-3 text-yellow-400" />
-                      <span className="text-sm font-black text-white">{bus.speed ?? 0} km/h</span>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-black/40 rounded-2xl p-4 border border-white/5">
+                  <div className="text-[10px] font-black text-white/20 uppercase tracking-widest mb-1">Battery</div>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 h-1.5 bg-zinc-900 rounded-full overflow-hidden">
+                      <div className="h-full bg-yellow-400" style={{ width: `${bus.battery}%` }} />
                     </div>
+                    <span className="text-xs font-black text-yellow-400">{bus.battery}%</span>
                   </div>
-                  <div>
-                    <div className="text-[9px] font-black uppercase text-white/30 mb-1">Battery</div>
-                    <div className="text-sm font-black" style={{ color: bus.battery < 25 ? '#ef4444' : bus.battery < 50 ? '#f59e0b' : '#4ade80' }}>
-                      {bus.battery ?? 0}%
+                </div>
+                <div className="bg-black/40 rounded-2xl p-4 border border-white/5">
+                  <div className="text-[10px] font-black text-white/20 uppercase tracking-widest mb-1">Speed</div>
+                  <div className="text-sm font-black text-white">{bus.speed} <span className="text-[10px] text-white/40">km/h</span></div>
+                </div>
+              </div>
+
+              <div className="bg-black/40 rounded-2xl p-4 border border-white/5 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <MapPin className="w-4 h-4 text-white/20" />
+                  <div className="text-xs font-bold text-white/60 tabular-nums">
+                    {bus.gpsLat.toFixed(4)}, {bus.gpsLng.toFixed(4)}
+                  </div>
+                </div>
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+              </div>
+
+              <AnimatePresence>
+                {editingId === bus.id && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 10 }}
+                    className="absolute inset-0 bg-zinc-900/95 rounded-3xl p-6 z-10 flex flex-col justify-between border-2 border-yellow-400/50 backdrop-blur-sm"
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[10px] font-black uppercase text-yellow-400 tracking-[0.2em]">Update Unit {bus.tag}</span>
+                      <button onClick={() => setEditingId(null)}><X className="w-5 h-5" /></button>
                     </div>
-                  </div>
-                </div>
-
-                <div>
-                  <div className="text-[9px] font-black uppercase text-white/30 mb-1">GPS</div>
-                  <div className="text-sm font-black text-white/80">
-                    {bus.gpsLat?.toFixed(5) ?? '—'}, {bus.gpsLng?.toFixed(5) ?? '—'}
-                  </div>
-                </div>
-
-                <div>
-                  <div className="h-1.5 bg-zinc-700 rounded-full overflow-hidden">
-                    <div
-                      className="h-full rounded-full transition-all"
-                      style={{
-                        width: `${bus.battery ?? 0}%`,
-                        background: bus.battery < 25 ? '#ef4444' : bus.battery < 50 ? '#f59e0b' : '#4ade80',
-                      }}
-                    />
-                  </div>
-                </div>
-
-                <div className={`text-[9px] font-black uppercase px-2 py-1 rounded-full w-fit ${
-                  bus.status === 'Active' || bus.status === 'En Route'
-                    ? 'bg-green-500/20 text-green-400'
-                    : 'bg-amber-500/20 text-amber-400 animate-pulse'
-                }`}>
-                  {bus.status}
-                </div>
-
-                {isEditing && (
-                  <div className="bg-zinc-900/30 rounded-2xl p-4 space-y-3">
+                    
                     <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="label-small">Destination</label>
-                        <input
-                          value={String(editingValues.destination ?? bus.destination ?? '')}
-                          onChange={(e) => setEditingValues((prev) => ({ ...prev, destination: e.target.value }))}
-                          list={destinationListId}
-                          className="w-full bg-zinc-950 border border-zinc-700 rounded-2xl px-3 py-2 font-black text-sm"
-                        />
-                      </div>
-                      <div>
-                        <label className="label-small">Seat Capacity</label>
-                        <input
-                          type="number"
-                          value={Number(editingValues.seatCapacity ?? bus.seatCapacity ?? 45)}
-                          onChange={(e) => setEditingValues((prev) => ({ ...prev, seatCapacity: Number(e.target.value) }))}
-                          className="w-full bg-zinc-950 border border-zinc-700 rounded-2xl px-3 py-2 font-black text-sm"
-                        />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="label-small">GPS Lat</label>
-                        <input
-                          type="number"
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-black uppercase text-white/30">Latitude</label>
+                        <input 
+                          type="number" 
                           value={editingValues.gpsLat}
-                          onChange={(e) => setEditingValues((prev) => ({ ...prev, gpsLat: Number(e.target.value) }))}
-                          className="w-full bg-zinc-950 border border-zinc-700 rounded-2xl px-3 py-2 font-black text-sm"
+                          onChange={e => setEditingValues(v => ({ ...v, gpsLat: Number(e.target.value) }))}
+                          className="w-full bg-black/60 border border-white/10 rounded-lg px-2 py-1.5 text-xs font-bold"
                         />
                       </div>
-                      <div>
-                        <label className="label-small">GPS Lng</label>
-                        <input
-                          type="number"
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-black uppercase text-white/30">Longitude</label>
+                        <input 
+                          type="number" 
                           value={editingValues.gpsLng}
-                          onChange={(e) => setEditingValues((prev) => ({ ...prev, gpsLng: Number(e.target.value) }))}
-                          className="w-full bg-zinc-950 border border-zinc-700 rounded-2xl px-3 py-2 font-black text-sm"
+                          onChange={e => setEditingValues(v => ({ ...v, gpsLng: Number(e.target.value) }))}
+                          className="w-full bg-black/60 border border-white/10 rounded-lg px-2 py-1.5 text-xs font-bold"
                         />
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="label-small">Speed</label>
-                        <input
-                          type="number"
-                          value={editingValues.speed}
-                          onChange={(e) => setEditingValues((prev) => ({ ...prev, speed: Number(e.target.value) }))}
-                          className="w-full bg-zinc-950 border border-zinc-700 rounded-2xl px-3 py-2 font-black text-sm"
-                        />
+                    <div className="grid grid-cols-2 gap-3 mt-2">
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-black uppercase text-white/30">Status</label>
+                        <select 
+                          value={editingValues.status}
+                          onChange={e => setEditingValues(v => ({ ...v, status: e.target.value }))}
+                          className="w-full bg-black/60 border border-white/10 rounded-lg px-2 py-1.5 text-xs font-bold"
+                        >
+                          <option value="Active">Active</option>
+                          <option value="En Route">En Route</option>
+                          <option value="Charging">Charging</option>
+                          <option value="Maintenance">Maintenance</option>
+                        </select>
                       </div>
-                      <div>
-                        <label className="label-small">Battery %</label>
-                        <input
-                          type="number"
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-black uppercase text-white/30">Battery %</label>
+                        <input 
+                          type="number" 
                           value={editingValues.battery}
-                          onChange={(e) => setEditingValues((prev) => ({ ...prev, battery: Number(e.target.value) }))}
-                          className="w-full bg-zinc-950 border border-zinc-700 rounded-2xl px-3 py-2 font-black text-sm"
+                          onChange={e => setEditingValues(v => ({ ...v, battery: Number(e.target.value) }))}
+                          className="w-full bg-black/60 border border-white/10 rounded-lg px-2 py-1.5 text-xs font-bold"
                         />
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between">
-                      <select
-                        value={editingValues.status}
-                        onChange={(e) => setEditingValues((prev) => ({ ...prev, status: e.target.value }))}
-                        className="bg-zinc-950 border border-zinc-700 rounded-2xl px-3 py-2 font-black text-sm"
-                      >
-                        <option value="Active">Active</option>
-                        <option value="En Route">En Route</option>
-                        <option value="Charging">Charging</option>
-                      </select>
-                      <button
-                        onClick={() => handleUpdateBus(bus.id)}
-                        className="btn-yellow px-5 py-2 font-black uppercase tracking-widest"
-                      >
-                        Save
-                      </button>
-                    </div>
-                  </div>
+                    <button 
+                      onClick={() => handleUpdateBus(bus.id)}
+                      className="w-full bg-yellow-400 text-black font-black uppercase text-[10px] py-3 rounded-xl mt-4 hover:bg-yellow-300 transition-colors"
+                    >
+                      Apply Sync
+                    </button>
+                  </motion.div>
                 )}
-              </motion.div>
-            );
-          })
+              </AnimatePresence>
+            </motion.div>
+          ))
         )}
       </div>
     </div>

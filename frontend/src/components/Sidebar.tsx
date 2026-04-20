@@ -33,8 +33,8 @@ export function Sidebar({ closeMenu }: SidebarProps) {
   const { user, logout, isAdmin } = useAuth();
 
   return (
-    <aside className="w-80 bg-black text-white flex flex-col h-screen sticky top-0 border-r-4 border-yellow-400">
-      <div className="p-10 flex items-center justify-between">
+    <aside className="w-full bg-black text-white flex flex-col h-full">
+      <div className="p-6 xl:p-10 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 bg-yellow-400 rounded-2xl flex items-center justify-center border-4 border-black rotate-3">
             <Bus className="text-black w-7 h-7" />

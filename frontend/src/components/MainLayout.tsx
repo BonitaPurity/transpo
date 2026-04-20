@@ -9,10 +9,12 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   return (
-    <div className="flex min-h-screen relative overflow-x-hidden">
+    <div className="flex min-h-screen relative overflow-x-hidden bg-white dark:bg-black">
       {/* Sidebar - Desktop */}
-      <div className="hidden lg:block shrink-0">
-        <Sidebar />
+      <div className="hidden lg:block shrink-0 border-r-4 border-yellow-400">
+        <div className="sticky top-0 h-screen w-64 xl:w-80">
+          <Sidebar />
+        </div>
       </div>
 
       {/* Sidebar - Mobile Overlay */}

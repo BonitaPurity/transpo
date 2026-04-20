@@ -11,6 +11,13 @@ const geist = Geist({
   subsets: ["latin"],
 });
 
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  themeColor: "#facc15",
+};
+
 export const metadata: Metadata = {
   title: "TRANSPO HUB | Uganda Modern Transit",
   description: "Modernizing regional bus transit in Uganda through strategic hubs.",
