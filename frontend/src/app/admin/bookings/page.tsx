@@ -29,13 +29,15 @@ export default function AdminBookings() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState<'csv' | 'pdf' | ''>('');
-
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('Completed');
+  const [error, setError] = useState('');
 
   const handleExport = async (format: 'csv' | 'pdf') => {
     if (!user?.email) return;
     setExporting(format);
     try {
-      await apiService.downloadAdminBookingsExport(format, 'Completed');
+      await apiService.downloadAdminBookingsExport(format, statusFilter);
     } catch (err: any) {
       console.error('Export failed', err);
       alert(`Export failed: ${err.message || 'Unknown error'}`);
@@ -44,20 +46,34 @@ export default function AdminBookings() {
     }
   };
 
-  useEffect(() => {
-    async function loadBookings() {
-      if (!user?.email) return;
-      try {
-        const res = await apiService.getBookings();
-        if (res.success) setBookings(res.data);
-      } catch (err) {
-        console.error('Failed to load bookings', err);
-      } finally {
-        setLoading(false);
+  const loadBookings = async () => {
+    if (!user?.email) return;
+    setLoading(true);
+    setError('');
+    try {
+      const res = await apiService.getBookings({ 
+        paymentStatus: statusFilter === 'All' ? undefined : statusFilter, 
+        search 
+      });
+      if (res.success) {
+        setBookings(res.data);
+      } else {
+        setError(res.message || 'Failed to load manifest');
       }
+    } catch (err) {
+      console.error('Failed to load bookings', err);
+      setError('Connection failed. Please check your network.');
+    } finally {
+      setLoading(false);
     }
-    loadBookings();
-  }, [user]);
+  };
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      loadBookings();
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [user, search, statusFilter]);
 
   return (
     <div className="space-y-8 text-white">
@@ -66,14 +82,27 @@ export default function AdminBookings() {
           <h2 className="text-4xl font-black text-yellow-400 uppercase italic tracking-tighter">Booking Manifest</h2>
           <p className="text-white/40 text-sm font-bold mt-1">All passenger tickets across every regional hub.</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center flex-wrap gap-3">
           <div className="bg-zinc-800 border border-zinc-700 px-5 py-3 rounded-2xl flex items-center gap-2">
             <Search className="w-4 h-4 text-white/30" />
-            <input type="text" placeholder="Search..." className="bg-transparent text-sm font-bold outline-none text-white placeholder:text-white/20 w-32" />
+            <input 
+              type="text" 
+              placeholder="Search..." 
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="bg-transparent text-sm font-bold outline-none text-white placeholder:text-white/20 w-32 md:w-48" 
+            />
           </div>
-          <button className="p-3.5 bg-zinc-800 border border-zinc-700 rounded-2xl hover:border-yellow-400/40 transition-all">
-            <Filter className="w-4 h-4 text-white/40" />
-          </button>
+          <select 
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="bg-zinc-800 border border-zinc-700 px-4 py-3 rounded-2xl text-sm font-bold outline-none text-white appearance-none cursor-pointer hover:border-yellow-400/40 transition-all"
+          >
+            <option value="All">All Status</option>
+            <option value="Completed">Completed</option>
+            <option value="Pending">Pending</option>
+            <option value="Cancelled">Cancelled</option>
+          </select>
           <button
             onClick={() => handleExport('csv')}
             disabled={!!exporting || bookings.length === 0}
@@ -96,6 +125,13 @@ export default function AdminBookings() {
           </button>
         </div>
       </header>
+
+      {error && (
+        <div className="bg-red-500/10 border border-red-500/20 p-6 rounded-3xl text-center">
+          <p className="text-red-400 font-black uppercase text-xs tracking-widest">{error}</p>
+          <button onClick={loadBookings} className="mt-4 text-white/40 hover:text-white font-bold text-[10px] uppercase">Try Again</button>
+        </div>
+      )}
 
       <div className="bg-zinc-800/60 border border-zinc-700 rounded-3xl overflow-hidden">
         <div className="grid grid-cols-7 gap-4 px-8 py-4 border-b border-zinc-700 text-[9px] font-black uppercase tracking-widest text-white/30">

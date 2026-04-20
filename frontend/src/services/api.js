@@ -257,8 +257,12 @@ export const apiService = {
     return request(`/admin/users/${encodeURIComponent(userId)}`);
   },
 
-  async getBookings() {
-    return request('/bookings?paymentStatus=Completed');
+  async getBookings(params = {}) {
+    const q = new URLSearchParams();
+    if (params.paymentStatus) q.append('paymentStatus', params.paymentStatus);
+    if (params.search) q.append('search', params.search);
+    const query = q.toString() ? `?${q.toString()}` : '';
+    return request(`/bookings${query}`);
   },
 
   async getUserBookings(userId) {

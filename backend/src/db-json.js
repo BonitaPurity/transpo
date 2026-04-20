@@ -1127,7 +1127,7 @@ async function findBookingByUserAndSchedule(userId, scheduleId, travelDate) {
   ) || null;
 }
 
-async function getBookings({ paymentStatus } = {}) {
+async function getBookings({ paymentStatus, search } = {}) {
   const [bookings, schedules, users, departures, buses] = await Promise.all([
     store.readAll('bookings'),
     store.readAll('schedules'),
@@ -1136,37 +1136,56 @@ async function getBookings({ paymentStatus } = {}) {
     store.readAll('buses'),
   ]);
 
-  const filtered = paymentStatus
-    ? bookings.filter((b) => String(b.paymentStatus) === String(paymentStatus))
-    : bookings;
+  const scheduleMap = new Map(schedules.map((s) => [s.id, s]));
+  const userMap = new Map(users.map((u) => [String(u.id), u]));
+  const departureMap = new Map(departures.map((d) => [d.id, d]));
+  const busMap = new Map(buses.map((b) => [b.id, b]));
 
-  return filtered
-    .map((b) => {
-      const s = schedules.find((x) => x.id === b.scheduleId);
-      const u = users.find((x) => String(x.id) === String(b.userId));
-      const d = b.departureId ? departures.find((x) => x.id === b.departureId) : null;
-      const bus = d ? buses.find((x) => x.id === d.busId) : null;
-      return {
-        id: b.id,
-        scheduleId: b.scheduleId,
-        departureId: b.departureId || null,
-        userId: b.userId || null,
-        passengerName: b.passengerName,
-        phoneNumber: b.phoneNumber,
-        paymentStatus: b.paymentStatus,
-        totalAmount: b.totalAmount,
-        travelDate: b.travelDate,
-        createdAt: b.createdAt,
-        destination: s?.destination || null,
-        departureTime: s?.departureTime || null,
-        busType: s?.busType || null,
-        hubId: s?.hubId || null,
-        userName: u?.name || null,
-        userEmail: u?.email || null,
-        busTag: bus?.tag || null,
-      };
-    })
-    .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+  let filtered = bookings;
+  if (paymentStatus) {
+    filtered = filtered.filter((b) => String(b.paymentStatus) === String(paymentStatus));
+  }
+
+  const result = filtered.map((b) => {
+    const s = scheduleMap.get(b.scheduleId);
+    const u = b.userId ? userMap.get(String(b.userId)) : null;
+    const d = b.departureId ? departureMap.get(b.departureId) : null;
+    const bus = d ? busMap.get(d.busId) : null;
+    
+    return {
+      id: b.id,
+      scheduleId: b.scheduleId,
+      departureId: b.departureId || null,
+      userId: b.userId || null,
+      passengerName: b.passengerName,
+      phoneNumber: b.phoneNumber,
+      paymentStatus: b.paymentStatus,
+      totalAmount: b.totalAmount,
+      travelDate: b.travelDate,
+      createdAt: b.createdAt,
+      destination: s?.destination || null,
+      departureTime: s?.departureTime || null,
+      busType: s?.busType || null,
+      hubId: s?.hubId || null,
+      userName: u?.name || null,
+      userEmail: u?.email || null,
+      busTag: bus?.tag || null,
+    };
+  });
+
+  if (search) {
+    const q = String(search).toLowerCase();
+    return result.filter((b) => 
+      String(b.id).toLowerCase().includes(q) ||
+      String(b.passengerName).toLowerCase().includes(q) ||
+      String(b.phoneNumber).toLowerCase().includes(q) ||
+      String(b.destination).toLowerCase().includes(q) ||
+      String(b.userEmail || '').toLowerCase().includes(q) ||
+      String(b.busTag || '').toLowerCase().includes(q)
+    );
+  }
+
+  return result.sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
 }
 
 async function getBookingsByScheduleAndDate(scheduleId, travelDate) {

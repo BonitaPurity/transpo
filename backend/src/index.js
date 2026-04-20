@@ -857,12 +857,12 @@ app.post('/api/bookings', attachUserIfPresent, async (req, res) => {
 });
 
 // 7. Bookings (List - Admin)
-app.get('/api/bookings', authenticateToken, async (req, res) => {
+app.get('/api/bookings', authenticateToken, withAsync(async (req, res) => {
   if (!requireAdmin(req, res)) return;
-  const { paymentStatus } = req.query;
-  const bookings = await db.getBookings(paymentStatus ? { paymentStatus } : undefined);
+  const { paymentStatus, search } = req.query;
+  const bookings = await db.getBookings({ paymentStatus, search });
   res.json({ success: true, data: bookings });
-});
+}));
 
 app.get('/api/admin/bookings/export', authenticateToken, withAsync(async (req, res) => {
   if (!requireAdmin(req, res)) return;
