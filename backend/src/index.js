@@ -48,8 +48,11 @@ const allowedOrigins = (() => {
 
 function isOriginAllowed(origin) {
   if (!origin) return true;
-  if (process.env.CORS_ALLOW_ALL === 'true' && process.env.NODE_ENV !== 'production') return true;
-  if (allowedOrigins.length === 0) return false;
+  if (process.env.CORS_ALLOW_ALL === 'true') return true;
+  if (allowedOrigins.length === 0) {
+    // If no origins specified and not explicitly disallowed, allow all in dev, but be careful in prod
+    return process.env.NODE_ENV !== 'production';
+  }
   return allowedOrigins.includes(origin);
 }
 
@@ -109,7 +112,12 @@ app.use(
       directives: {
         ...helmet.contentSecurityPolicy.getDefaultDirectives(),
         'img-src': ["'self'", 'data:', '*.basemaps.cartocdn.com', '*.tile.openstreetmap.org', 'openstreetmap.org'],
-        'connect-src': ["'self'", ...allowedOrigins, ...(process.env.NODE_ENV === 'production' ? [] : ['ws:', 'wss:', 'http:', 'https:'])],
+        'connect-src': [
+          "'self'",
+          ...allowedOrigins,
+          ...(process.env.CORS_ALLOW_ALL === 'true' ? ['*'] : []),
+          ...(process.env.NODE_ENV === 'production' ? [] : ['ws:', 'wss:', 'http:', 'https:']),
+        ],
       },
     },
   })

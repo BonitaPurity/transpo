@@ -17,7 +17,9 @@ function requireEnv(name) {
 
   const existing = await db.findUserByEmail(email);
   if (existing) {
-    console.log(`Admin already exists: ${email}`);
+    console.log(`Admin already exists: ${email}. Updating password...`);
+    await db.updateUserPassword(existing.id, password);
+    console.log(`Password updated for ${email}`);
     await db.closePool();
     process.exit(0);
   }
