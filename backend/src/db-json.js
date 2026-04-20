@@ -123,6 +123,49 @@ function computeExpectedArrivalAt(travelDate, departureTime, durationStr) {
   return dt.toISOString();
 }
 
+async function syncFleetHubFare() {
+  const [buses, hubs, fares, routes] = await Promise.all([
+    store.readAll('buses'),
+    store.readAll('hubs'),
+    store.readAll('bus_fares'),
+    store.readAll('pricing_routes'),
+  ]);
+
+  let changedFares = false;
+  let changedRoutes = false;
+
+  // 1. Ensure each approved bus has a fare record
+  for (const bus of buses) {
+    if (bus.approved === false) continue;
+    const existingFare = fares.find((f) => f.busId === bus.id);
+    if (!existingFare) {
+      fares.push({
+        id: normalizeIdPrefix('fare'),
+        busId: bus.id,
+        fareAmount: 15000, // Default baseline
+        createdAt: nowIso(),
+        updatedAt: nowIso(),
+      });
+      changedFares = true;
+    }
+  }
+
+  // 2. Sync pricing_routes with current hubs and buses if possible
+  for (let i = 0; i < routes.length; i++) {
+    const r = routes[i];
+    const hub = hubs.find((h) => h.code === r.hubCode || h.id === r.hubId || h.name.includes(r.hub));
+    if (hub && (r.color !== hub.color || r.hubCode !== hub.code)) {
+      routes[i] = { ...r, color: hub.color, hubCode: hub.code, hub: hub.name.split(' ')[0] };
+      changedRoutes = true;
+    }
+  }
+
+  if (changedFares) await store.replaceAll('bus_fares', fares);
+  if (changedRoutes) await store.replaceAll('pricing_routes', routes);
+
+  return { changedFares, changedRoutes };
+}
+
 async function initDb() {
   if (typeof store.init === 'function') {
     await store.init();
@@ -131,20 +174,21 @@ async function initDb() {
   const seedDemo = process.env.JSON_SEED_DEMO_DATA === 'true';
   const seedBase = process.env.SEED_BASE_DATA === 'true' || seedDemo;
 
-  if (seedBase) {
-    const hubSeeds = [
-      ['hub_east', 'Namanve Hub (East)', 'East/Jinja Route', '150 buses/day', 0.3521, 32.5915, '#facc15', 'NMV'],
-      ['hub_west', 'Busega Hub (West)', 'West/Mbarara Route', '200 buses/day', -0.3127, 31.7138, '#38bdf8', 'BSG'],
-      ['hub_north', 'Kawempe Hub (North)', 'North/Gulu Route', '120 buses/day', 0.4502, 33.1998, '#fb923c', 'KWP'],
-    ];
-    await withEntityDoc('hubs', async (doc) => {
-      for (const h of hubSeeds) {
-        if (doc.records.some((x) => x.id === h[0])) continue;
-        doc.records.push({ id: h[0], name: h[1], region: h[2], capacity: h[3], lat: h[4], lng: h[5], color: h[6], code: h[7] });
-      }
-      return { __write: true, value: true };
-    });
-  }
+  // Always ensure hubs exist even if seedBase is false
+  const hubSeeds = [
+    ['hub_east', 'Namanve Hub (East)', 'East/Jinja Route', '150 buses/day', 0.3521, 32.5915, '#facc15', 'NMV'],
+    ['hub_west', 'Busega Hub (West)', 'West/Mbarara Route', '200 buses/day', -0.3127, 31.7138, '#38bdf8', 'BSG'],
+    ['hub_north', 'Kawempe Hub (North)', 'North/Gulu Route', '120 buses/day', 0.4502, 33.1998, '#fb923c', 'KWP'],
+  ];
+  await withEntityDoc('hubs', async (doc) => {
+    let changed = false;
+    for (const h of hubSeeds) {
+      if (doc.records.some((x) => x.id === h[0])) continue;
+      doc.records.push({ id: h[0], name: h[1], region: h[2], capacity: h[3], lat: h[4], lng: h[5], color: h[6], code: h[7] });
+      changed = true;
+    }
+    return changed ? { __write: true, value: true } : { value: true };
+  });
 
   if (seedDemo) {
   const scheduleSeeds = [
@@ -297,6 +341,9 @@ async function initDb() {
     return { __write: true, value: true };
   });
   }
+
+  // Always run sync after init
+  await syncFleetHubFare();
 }
 
 async function resetOperationalData() {
@@ -475,16 +522,37 @@ async function findScheduleByHubDestinationTime(hubId, destination, departureTim
 }
 
 async function createSchedule({ id, hubId, destination, departureTime, status, price, busType, duration, seatsAvailable }) {
+  let finalPrice = price;
+  let finalBusType = busType;
+  let finalDuration = duration;
+
+  // Try to find a baseline from pricing_routes or existing schedules if not provided
+  if (finalPrice === null || finalPrice === undefined) {
+    const routes = await store.readAll('pricing_routes');
+    const baseline = routes.find((r) => r.hubId === hubId && r.destination === destination);
+    if (baseline) {
+      finalPrice = baseline.currentPrice;
+    } else {
+      const existing = await store.readAll('schedules');
+      const match = existing.find((s) => s.hubId === hubId && s.destination === destination && s.price);
+      if (match) {
+        finalPrice = match.price;
+        finalBusType = match.busType;
+        finalDuration = match.duration;
+      }
+    }
+  }
+
   const record = {
     id: id || normalizeIdPrefix('sch'),
     hubId,
     destination: destination || null,
     departureTime: departureTime || null,
     status: status || 'Active',
-    price: price ?? null,
-    busType: busType ?? null,
-    duration: duration ?? null,
-    seatsAvailable: seatsAvailable ?? null,
+    price: finalPrice ?? 15000,
+    busType: finalBusType ?? 'Standard',
+    duration: finalDuration ?? '4 hrs',
+    seatsAvailable: seatsAvailable ?? 45,
   };
   await store.create('schedules', record);
   return record;
@@ -545,21 +613,21 @@ async function getDeparturesBetween(startDate, endDate, hubId) {
     .map((d) => {
       const s = schedules.find((x) => x.id === d.scheduleId);
       const b = buses.find((x) => x.id === d.busId);
-      if (!s || !b || b.approved === false || d.status === 'Cancelled') return null;
-      if (hubId && s.hubId !== hubId) return null;
-      const busFare = fares.find((f) => f.busId === b.id);
+      if (hubId && s && s.hubId !== hubId) return null;
+      const busFare = fares.find((f) => f.busId === (b?.id || d.busId));
+
       return {
         ...d,
-        hubId: s.hubId,
-        destination: s.destination,
-        departureTime: s.departureTime,
-        duration: s.duration,
-        price: s.price,
-        scheduleStatus: s.status,
-        busType: s.busType,
-        busTag: b.tag,
-        busSeatCapacity: b.seatCapacity,
-        approved: b.approved !== false,
+        hubId: s?.hubId || 'N/A',
+        destination: s?.destination || 'N/A',
+        departureTime: s?.departureTime || 'N/A',
+        duration: s?.duration || 'N/A',
+        price: s?.price || 0,
+        scheduleStatus: s?.status || 'N/A',
+        busType: s?.busType || 'N/A',
+        busTag: b?.tag || 'N/A',
+        busSeatCapacity: b?.seatCapacity || d.seatCapacity || 45,
+        approved: b?.approved !== false,
         busFareAmount: busFare ? Number(busFare.fareAmount) : null,
       };
     })
@@ -1013,12 +1081,15 @@ async function createBus({ id, tag, hubId, destination, status, speed, battery, 
     updatedAt: nowIso(),
   };
   await store.upsert('buses', (b) => b.id === record.id, () => record);
+  await syncFleetHubFare(); // Ensure fare record exists
   return getBusById(record.id);
 }
 
 async function updateBus(id, updates) {
   if (!updates || Object.keys(updates).length === 0) return getBusById(id);
-  return store.updateById('buses', id, (b) => ({ ...b, ...updates, updatedAt: nowIso() }));
+  const updated = await store.updateById('buses', id, (b) => ({ ...b, ...updates, updatedAt: nowIso() }));
+  await syncFleetHubFare(); // Re-sync in case hub/approval changed
+  return updated;
 }
 
 async function decrementSeat(scheduleId) {
@@ -1329,4 +1400,5 @@ module.exports = {
   backupData,
   recoverEntity,
   resetOperationalData,
+  syncFleetHubFare,
 };
