@@ -36,6 +36,9 @@ export default function AdminBookings() {
     setExporting(format);
     try {
       await apiService.downloadAdminBookingsExport(format, 'Completed');
+    } catch (err: any) {
+      console.error('Export failed', err);
+      alert(`Export failed: ${err.message || 'Unknown error'}`);
     } finally {
       setExporting('');
     }

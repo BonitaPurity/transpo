@@ -864,7 +864,7 @@ app.get('/api/bookings', authenticateToken, async (req, res) => {
   res.json({ success: true, data: bookings });
 });
 
-app.get('/api/admin/bookings/export', authenticateToken, async (req, res) => {
+app.get('/api/admin/bookings/export', authenticateToken, withAsync(async (req, res) => {
   if (!requireAdmin(req, res)) return;
   const format = String(req.query.format || '').toLowerCase();
   const { paymentStatus } = req.query;
@@ -872,20 +872,29 @@ app.get('/api/admin/bookings/export', authenticateToken, async (req, res) => {
 
   if (format === 'csv') {
     const headers = ['Pass ID', 'Passenger', 'Phone', 'Route', 'Bus Type', 'Date', 'Time', 'Status', 'Amount'];
+    const escapeCsv = (val) => {
+      const s = String(val === null || val === undefined ? '' : val);
+      if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+        return `"${s.replace(/"/g, '""')}"`;
+      }
+      return s;
+    };
+
     const rows = bookings.map((b) => ([
-      b.id,
-      b.passengerName,
-      b.phoneNumber,
-      `Kampala -> ${b.destination || ''}`,
-      b.busType || '',
-      b.travelDate,
-      b.departureTime,
-      b.paymentStatus,
-      b.totalAmount,
+      escapeCsv(b.id),
+      escapeCsv(b.passengerName),
+      escapeCsv(b.phoneNumber),
+      escapeCsv(`Kampala -> ${b.destination || ''}`),
+      escapeCsv(b.busType || ''),
+      escapeCsv(b.travelDate),
+      escapeCsv(b.departureTime),
+      escapeCsv(b.paymentStatus),
+      escapeCsv(b.totalAmount),
     ].join(',')));
+
     const csvContent = [headers.join(','), ...rows].join('\n');
     const dateKey = new Date().toISOString().split('T')[0];
-    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename=TRANSPO_BOOKINGS_${dateKey}.csv`);
     return res.send(csvContent);
   }
@@ -929,7 +938,7 @@ app.get('/api/admin/bookings/export', authenticateToken, async (req, res) => {
   }
 
   return res.status(400).json({ success: false, message: 'Unsupported export format' });
-});
+}));
 
 // 7b. User bookings (Specific route first)
 app.get('/api/bookings/user/:id', authenticateToken, async (req, res) => {

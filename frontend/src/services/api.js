@@ -74,7 +74,14 @@ async function downloadBlobFromPath(path, filename) {
     if (res.status === 401 && typeof window !== 'undefined') {
       localStorage.removeItem('transpo_user');
     }
-    throw new Error('Download failed');
+    let message = 'Download failed';
+    try {
+      const errJson = await res.json();
+      if (errJson && errJson.message) message = errJson.message;
+    } catch (e) {
+      // Not JSON
+    }
+    throw new Error(message);
   }
   const contentType = res.headers.get('content-type') || '';
   const blob = await res.blob();
