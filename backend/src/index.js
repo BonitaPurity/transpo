@@ -34,6 +34,15 @@ function parseAllowedOrigins(value) {
     .filter(Boolean);
 }
 
+const TRUSTED_CLOUD_DOMAINS = [
+  'vercel.app',
+  'onrender.com',
+  'netlify.app',
+  'railway.app',
+  'bonitapurity',
+  'gitpod.io'
+];
+
 const allowedOrigins = (() => {
   const env = parseAllowedOrigins(process.env.CORS_ORIGINS);
   if (env.length > 0) return env;
@@ -50,12 +59,13 @@ function isOriginAllowed(origin) {
   if (!origin) return true;
   if (process.env.CORS_ALLOW_ALL === 'true') return true;
   
+  // Always permit safe dynamic prefixes securely
+  if (TRUSTED_CLOUD_DOMAINS.some(domain => origin.includes(domain))) {
+    return true;
+  }
+  
   if (allowedOrigins.length === 0) {
-    if (process.env.NODE_ENV !== 'production') return true;
-    // In production without origins explicitly configured, allow common cloud prefixes securely
-    if (origin.includes('vercel.app') || origin.includes('onrender.com') || origin.includes('netlify.app') || origin.includes('railway.app') || origin.includes('bonitapurity')) {
-      return true;
-    }
+    return process.env.NODE_ENV !== 'production';
   }
   
   return allowedOrigins.some(allowed => 
@@ -125,8 +135,12 @@ app.use(
         'connect-src': [
           "'self'",
           ...allowedOrigins,
+          ...TRUSTED_CLOUD_DOMAINS.map(d => `*.${d}`),
           ...(process.env.CORS_ALLOW_ALL === 'true' ? ['*'] : []),
-          ...(process.env.NODE_ENV === 'production' ? [] : ['ws:', 'wss:', 'http:', 'https:']),
+          'ws:',
+          'wss:',
+          'http:',
+          'https:',
         ],
       },
     },
@@ -688,7 +702,10 @@ app.delete('/api/departures/:id', authenticateToken, async (req, res) => {
 });
 
 // 5. Fleet management (admin-only)
-app.get('/api/fleet', async (req, res) => {
+app.get('/api/fleet', authenticateToken, async (req, res) => {
+  const admin = requireAdmin(req, res);
+  if (!admin) return;
+
   const { hubId } = req.query;
   const fleet = await db.getBuses(hubId);
   res.json({ success: true, data: fleet });
