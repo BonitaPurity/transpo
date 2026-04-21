@@ -49,11 +49,21 @@ const allowedOrigins = (() => {
 function isOriginAllowed(origin) {
   if (!origin) return true;
   if (process.env.CORS_ALLOW_ALL === 'true') return true;
+  
   if (allowedOrigins.length === 0) {
-    // If no origins specified and not explicitly disallowed, allow all in dev, but be careful in prod
-    return process.env.NODE_ENV !== 'production';
+    if (process.env.NODE_ENV !== 'production') return true;
+    // In production without origins explicitly configured, allow common cloud prefixes securely
+    if (origin.includes('vercel.app') || origin.includes('onrender.com') || origin.includes('netlify.app') || origin.includes('railway.app') || origin.includes('bonitapurity')) {
+      return true;
+    }
   }
-  return allowedOrigins.includes(origin);
+  
+  return allowedOrigins.some(allowed => 
+    origin === allowed || 
+    origin.startsWith(allowed) || 
+    origin.includes(allowed.replace(/^https?:\/\//, '')) || 
+    allowed === '*'
+  );
 }
 
 const corsOptions = {
@@ -123,7 +133,7 @@ app.use(
   })
 );
 app.use(cors(corsOptions));
-app.options('*', cors(corsOptions));
+app.options(/(.*)/, cors(corsOptions));
 app.use(compression());
 app.use(morgan('combined'));
 app.use(express.json());
@@ -241,7 +251,6 @@ function isValidEmail(value) {
   return typeof value === 'string' && /^[\w-.]+@([\w-]+\.)+[\w-]{2,4}$/.test(value);
 }
 
-// 1. Auth: Login (user + admin)
 app.post('/api/auth/login', authLimiter, async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) {
@@ -258,9 +267,35 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
     }
 
     const bcrypt = require('bcryptjs');
-    const valid = bcrypt.compareSync(password, user.password);
+    let valid = false;
+    let needsHashUpgrade = false;
+
+    // Check if the password is valid using bcrypt
+    try {
+      valid = bcrypt.compareSync(password, user.password);
+    } catch (err) {
+      // bcrypt throws on invalid hash types (like plaintext passwords)
+      valid = false;
+    }
+
+    // Fallback: If bcrypt failed, check if the password is raw plaintext (e.g. from manual admin creation)
+    if (!valid && password === user.password) {
+      valid = true;
+      needsHashUpgrade = true;
+      console.log(`[Auth] Legacy plaintext authentication detected for user ${user.email}. Executing hash upgrade...`);
+    }
+
     if (!valid) {
       return res.status(401).json({ success: false, message: 'Invalid credentials' });
+    }
+
+    if (needsHashUpgrade) {
+      try {
+        await db.updateUserPassword(user.id, password);
+        console.log(`[Auth] successfully upgraded hash for user ${user.email}`);
+      } catch (upgradeErr) {
+        console.error('[Auth] failed to auto-upgrade legacy plain-text hash:', upgradeErr);
+      }
     }
 
     const payload = {
