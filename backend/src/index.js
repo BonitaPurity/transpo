@@ -62,7 +62,7 @@ const corsOptions = {
     return cb(new Error('CORS blocked'), false);
   },
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['content-type', 'authorization', 'x-requested-with', 'accept'],
   optionsSuccessStatus: 200,
 };
 
@@ -122,10 +122,10 @@ app.use(
     },
   })
 );
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 app.use(compression());
 app.use(morgan('combined'));
-app.use(cors(corsOptions));
-app.options(/.*/, cors(corsOptions));
 app.use(express.json());
 
 app.use((req, res, next) => {
@@ -171,8 +171,12 @@ function signToken(user) {
 }
 
 function authenticateToken(req, res, next) {
-  const authHeader = req.headers.authorization || '';
-  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+  const authHeader = String(req.headers.authorization || '').trim();
+  if (!authHeader) {
+    return res.status(401).json({ success: false, message: 'Authorization token missing' });
+  }
+  
+  const token = authHeader.toLowerCase().startsWith('bearer ') ? authHeader.slice(7).trim() : null;
   if (!token) {
     return res.status(401).json({ success: false, message: 'Authorization token missing' });
   }

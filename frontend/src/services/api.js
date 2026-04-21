@@ -21,9 +21,18 @@ function getStoredAuth() {
 
 function getAuthHeaders() {
   const auth = getStoredAuth();
-  const headers = { 'Content-Type': 'application/json' };
-  if (auth?.token) {
-    headers.Authorization = `Bearer ${auth.token}`;
+  const headers = {
+    'content-type': 'application/json',
+    'accept': 'application/json',
+  };
+  
+  if (auth && auth.token) {
+    headers['authorization'] = `Bearer ${auth.token}`;
+  } else {
+    // Helpful log for debugging in production
+    if (typeof window !== 'undefined') {
+      console.warn('TRANSPO_API: Request attempted without active session token.');
+    }
   }
   return headers;
 }
@@ -105,15 +114,20 @@ async function request(path, options = {}, attempt = 0) {
   const url = `${getApiBaseUrl()}${path}`;
   try {
     const { headers: customHeaders, ...restOptions } = options;
+    const finalHeaders = { ...getAuthHeaders(), ...(customHeaders || {}) };
+    
     const res = await fetch(url, {
-      headers: { ...getAuthHeaders(), ...(customHeaders || {}) },
+      headers: finalHeaders,
       ...restOptions,
     });
-    
+
     if (!res.ok) {
       if (res.status === 401) {
+        console.error(`TRANSPO_API: 401 Unauthorized for ${path}. Token may be missing or expired.`);
         if (typeof window !== 'undefined') {
           localStorage.removeItem('transpo_user');
+          // Dispatch a custom event so the UI can respond to the session loss
+          window.dispatchEvent(new CustomEvent('transpo_unauthorized'));
         }
       }
       console.warn(`API Request failed: ${res.status} ${res.statusText} for ${url}`);
@@ -273,7 +287,7 @@ export const apiService = {
   async createBus(busData) {
     return request('/fleet', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'content-type': 'application/json' },
       body: JSON.stringify(busData),
     });
   },
