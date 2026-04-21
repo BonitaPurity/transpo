@@ -104,9 +104,10 @@ async function downloadBlobFromPath(path, filename) {
 async function request(path, options = {}, attempt = 0) {
   const url = `${getApiBaseUrl()}${path}`;
   try {
+    const { headers: customHeaders, ...restOptions } = options;
     const res = await fetch(url, {
-      headers: { ...getAuthHeaders(), ...(options.headers || {}) },
-      ...options,
+      headers: { ...getAuthHeaders(), ...(customHeaders || {}) },
+      ...restOptions,
     });
     
     if (!res.ok) {
