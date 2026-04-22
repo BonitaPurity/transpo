@@ -6,6 +6,8 @@ import { Activity, Wifi, Zap, Radio, RefreshCw, MapPin } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { apiService } from '@/services/api';
 import { useSocket } from '@/context/SocketContext';
+import { useAuth } from '@/context/AuthContext';
+import { useRouter } from 'next/navigation';
 import { 
   LineChart, Line, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, AreaChart, Area 
 } from 'recharts';
@@ -143,6 +145,9 @@ export default function Monitoring() {
   const [etaMinutes, setEtaMinutes] = useState<number | null>(null);
   const [resolvedDestinationCoord, setResolvedDestinationCoord] = useState<{ lat: number; lng: number } | null>(null);
   const geocodeCacheRef = useRef<Record<string, { lat: number; lng: number } | null>>({});
+
+  const { user, isAdmin, isLoading } = useAuth();
+  const router = useRouter();
 
   const socket = useSocket();
   const selectedBusId = selected?.id;
@@ -417,13 +422,19 @@ export default function Monitoring() {
   };
 
   useEffect(() => {
+    if (isLoading) return;
+    if (!user || !isAdmin) {
+      setLoading(false);
+      router.replace('/login');
+      return;
+    }
     fetchFleet();
     fetchAlerts();
     const interval = setInterval(() => {
       fetchAlerts();
     }, 10000);
     return () => clearInterval(interval);
-  }, []);
+  }, [isLoading, user, isAdmin, router]);
 
   const statusColor = (s: string) => {
     if (s === 'Active' || s === 'En Route') return 'bg-green-500';
