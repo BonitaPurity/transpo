@@ -109,7 +109,19 @@ async function runLoad(name, fn, { concurrency, iterations }) {
   const auth = { Authorization: `Bearer ${token}` };
 
   const results = [];
+  const routes = [
+    { srcLat: 0.3476, srcLng: 32.5825, destLat: 0.3521, destLng: 32.6490 },
+    { srcLat: 0.3127, srcLng: 32.5280, destLat: 0.3660, destLng: 32.5530 },
+    { srcLat: 0.0511, srcLng: 32.4637, destLat: 0.3476, destLng: 32.5825 },
+    { srcLat: 0.4244, srcLng: 33.2042, destLat: 0.3476, destLng: 32.5825 },
+    { srcLat: -0.3127, srcLng: 31.7138, destLat: 0.3476, destLng: 32.5825 },
+  ];
   results.push(await runLoad('GET /api/health', () => http('GET', `${api}/health`), { concurrency: 30, iterations: 300 }));
+  results.push(await runLoad('GET /api/routing', () => {
+    const r = routes[Math.floor(Math.random() * routes.length)];
+    const qs = `srcLat=${r.srcLat}&srcLng=${r.srcLng}&destLat=${r.destLat}&destLng=${r.destLng}`;
+    return http('GET', `${api}/routing?${qs}`);
+  }, { concurrency: 8, iterations: 120 }));
   results.push(await runLoad('GET /api/metrics/detailed (admin)', () => http('GET', `${api}/metrics/detailed`, { headers: auth }), { concurrency: 20, iterations: 120 }));
   results.push(await runLoad('GET /api/admin/deliveries (admin)', () => http('GET', `${api}/admin/deliveries`, { headers: auth }), { concurrency: 20, iterations: 120 }));
   results.push(await runLoad('GET /api/admin/manifest/export?format=pdf (admin)', () => http('GET', `${api}/admin/manifest/export?format=pdf`, { headers: auth }), { concurrency: 5, iterations: 15 }));

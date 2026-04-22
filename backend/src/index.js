@@ -1689,13 +1689,16 @@ app.get('/api/routing', async (req, res) => {
     if (!srcLat || !srcLng || !destLat || !destLng) {
       return res.status(400).json({ success: false, message: 'Source and destination coordinates are required' });
     }
+
+    const sLat = Number(srcLat);
+    const sLng = Number(srcLng);
+    const dLat = Number(destLat);
+    const dLng = Number(destLng);
+    if (![sLat, sLng, dLat, dLng].every((n) => Number.isFinite(n))) {
+      return res.status(400).json({ success: false, message: 'Coordinates must be valid numbers' });
+    }
     
-    const path = await getOrFetchOSRMRoute(
-      parseFloat(srcLat), 
-      parseFloat(srcLng), 
-      parseFloat(destLat), 
-      parseFloat(destLng)
-    );
+    const path = await getOrFetchOSRMRoute(sLat, sLng, dLat, dLng);
     
     if (!path) {
       return res.status(404).json({ success: false, message: 'No road route found between these points' });
@@ -1789,25 +1792,142 @@ const CITY_COORDS = {
 
 const CITY_NAMES = Object.keys(CITY_COORDS);
 
-const routeCache = {}; // Cache format: "srcLat,srcLng_destLat,destLng" -> [{lat, lng}, ...]
+const OSRM_CACHE_ENABLED = String(process.env.OSRM_CACHE_ENABLED ?? 'true').toLowerCase() !== 'false';
+const OSRM_CACHE_MAX_ENTRIES = Math.max(0, Number(process.env.OSRM_CACHE_MAX_ENTRIES || 800));
+const OSRM_CACHE_TTL_MS = Math.max(0, Number(process.env.OSRM_CACHE_TTL_MS || 6 * 60 * 60 * 1000));
+const OSRM_CACHE_COORD_PRECISION = Math.min(6, Math.max(0, Number(process.env.OSRM_CACHE_COORD_PRECISION || 4)));
+const OSRM_FETCH_TIMEOUT_MS = Math.max(500, Number(process.env.OSRM_FETCH_TIMEOUT_MS || 6000));
+
+class LruTtlCache {
+  constructor({ maxEntries, ttlMs }) {
+    this.maxEntries = Number.isFinite(Number(maxEntries)) ? Number(maxEntries) : 0;
+    this.ttlMs = Number.isFinite(Number(ttlMs)) ? Number(ttlMs) : 0;
+    this.map = new Map();
+    this.hits = 0;
+    this.misses = 0;
+    this.evictions = 0;
+    this.expired = 0;
+  }
+
+  get(key) {
+    const entry = this.map.get(key);
+    if (!entry) {
+      this.misses++;
+      return null;
+    }
+    if (entry.expiresAt !== 0 && Date.now() > entry.expiresAt) {
+      this.map.delete(key);
+      this.expired++;
+      this.misses++;
+      return null;
+    }
+    this.map.delete(key);
+    this.map.set(key, entry);
+    this.hits++;
+    return entry.value;
+  }
+
+  set(key, value) {
+    const expiresAt = this.ttlMs > 0 ? Date.now() + this.ttlMs : 0;
+    if (this.map.has(key)) this.map.delete(key);
+    this.map.set(key, { value, expiresAt });
+    while (this.maxEntries > 0 && this.map.size > this.maxEntries) {
+      const oldestKey = this.map.keys().next().value;
+      if (oldestKey === undefined) break;
+      this.map.delete(oldestKey);
+      this.evictions++;
+    }
+  }
+
+  stats() {
+    return {
+      enabled: OSRM_CACHE_ENABLED,
+      maxEntries: this.maxEntries,
+      ttlMs: this.ttlMs,
+      size: this.map.size,
+      hits: this.hits,
+      misses: this.misses,
+      evictions: this.evictions,
+      expired: this.expired,
+    };
+  }
+}
+
+const osrmCache = new LruTtlCache({ maxEntries: OSRM_CACHE_MAX_ENTRIES, ttlMs: OSRM_CACHE_TTL_MS });
+const osrmInFlight = new Map();
+const osrmFetchStats = { fetchErrors: 0, timeouts: 0, lastErrorAt: null, lastTimeoutAt: null };
+let osrmFailureStreak = 0;
+let lastOsrmAlertAt = 0;
 
 async function getOrFetchOSRMRoute(srcLat, srcLng, destLat, destLng) {
-  const cacheKey = `${srcLat.toFixed(4)},${srcLng.toFixed(4)}_${destLat.toFixed(4)},${destLng.toFixed(4)}`;
-  if (routeCache[cacheKey]) return routeCache[cacheKey];
+  if (![srcLat, srcLng, destLat, destLng].every((n) => Number.isFinite(Number(n)))) return null;
+  const precision = OSRM_CACHE_COORD_PRECISION;
+  const cacheKey = `${Number(srcLat).toFixed(precision)},${Number(srcLng).toFixed(precision)}_${Number(destLat).toFixed(precision)},${Number(destLng).toFixed(precision)}`;
 
-  try {
-    const url = `https://router.project-osrm.org/route/v1/driving/${srcLng},${srcLat};${destLng},${destLat}?overview=full&geometries=geojson`;
-    const response = await fetch(url);
-    const data = await response.json();
-    if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
-      const coords = data.routes[0].geometry.coordinates.map(c => ({ lat: c[1], lng: c[0] }));
-      routeCache[cacheKey] = coords;
-      return coords;
-    }
-  } catch (err) {
-    console.error(`OSRM fetch failed for ${cacheKey}:`, err.message);
+  if (OSRM_CACHE_ENABLED) {
+    const cached = osrmCache.get(cacheKey);
+    if (cached) return cached;
   }
-  return null; // Fallback to calculation
+
+  const inFlight = osrmInFlight.get(cacheKey);
+  if (inFlight) return inFlight;
+
+  const p = (async () => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), OSRM_FETCH_TIMEOUT_MS);
+    try {
+      const url = `https://router.project-osrm.org/route/v1/driving/${srcLng},${srcLat};${destLng},${destLat}?overview=full&geometries=geojson`;
+      const response = await fetch(url, { signal: controller.signal });
+      if (!response || response.ok !== true) {
+        osrmFailureStreak++;
+        osrmFetchStats.fetchErrors++;
+        osrmFetchStats.lastErrorAt = new Date().toISOString();
+        return null;
+      }
+      const data = await response.json();
+      if (data?.code === 'Ok' && Array.isArray(data.routes) && data.routes.length > 0) {
+        const raw = data.routes[0]?.geometry?.coordinates;
+        if (Array.isArray(raw) && raw.length > 0) {
+          const coords = raw
+            .filter((c) => Array.isArray(c) && c.length >= 2)
+            .map((c) => [Number(c[1]), Number(c[0])])
+            .filter((p) => Number.isFinite(p[0]) && Number.isFinite(p[1]));
+          if (coords.length > 0) {
+            osrmFailureStreak = 0;
+            if (OSRM_CACHE_ENABLED) osrmCache.set(cacheKey, coords);
+            return coords;
+          }
+        }
+      }
+      osrmFailureStreak++;
+      return null;
+    } catch (err) {
+      if (err?.name === 'AbortError') {
+        osrmFetchStats.timeouts++;
+        osrmFetchStats.lastTimeoutAt = new Date().toISOString();
+      } else {
+        osrmFetchStats.fetchErrors++;
+        osrmFetchStats.lastErrorAt = new Date().toISOString();
+      }
+      osrmFailureStreak++;
+      return null;
+    } finally {
+      clearTimeout(timeoutId);
+      if (osrmFailureStreak >= 10 && Date.now() - lastOsrmAlertAt > 30 * 60 * 1000) {
+        lastOsrmAlertAt = Date.now();
+        try {
+          await db.createAlert('warning', 'Routing provider degraded: OSRM route fetches are failing repeatedly. Falling back to straight-line routing.');
+        } catch {}
+      }
+    }
+  })();
+
+  osrmInFlight.set(cacheKey, p);
+  try {
+    return await p;
+  } finally {
+    osrmInFlight.delete(cacheKey);
+  }
 }
 
 const busPathProgress = {}; // Store index progress of each bus
@@ -1970,13 +2090,13 @@ async function startSimulation() {
                   // Arrived
                   const lastPoint = path[path.length - 1];
                   await db.updateBusPosition(bus.id, {
-                      gpsLat: lastPoint.lat,
-                      gpsLng: lastPoint.lng,
+                      gpsLat: lastPoint[0],
+                      gpsLng: lastPoint[1],
                       battery: Math.max(0, currentBus.battery - 1),
                       status: 'Arrived',
                       speed: 0
                   });
-                  await autoMarkArrivedDeliveriesForBus({ busId: bus.id, gpsLat: lastPoint.lat, gpsLng: lastPoint.lng, destinationName: currentBus.destination });
+                  await autoMarkArrivedDeliveriesForBus({ busId: bus.id, gpsLat: lastPoint[0], gpsLng: lastPoint[1], destinationName: currentBus.destination });
                   await db.createAlert('info', `${currentBus.tag} has arrived at destination: ${currentBus.destination}`);
                   delete busPathProgress[currentBus.id];
               } else {
@@ -1987,13 +2107,13 @@ async function startSimulation() {
                   const newBattery = Math.max(0, currentBus.battery - batteryDrain);
 
                   await db.updateBusPosition(bus.id, {
-                      gpsLat: nextPoint.lat,
-                      gpsLng: nextPoint.lng,
+                      gpsLat: nextPoint[0],
+                      gpsLng: nextPoint[1],
                       battery: newBattery,
                       status: currentBus.status,
                       speed: speed
                   });
-                  await autoMarkArrivedDeliveriesForBus({ busId: bus.id, gpsLat: nextPoint.lat, gpsLng: nextPoint.lng, destinationName: currentBus.destination });
+                  await autoMarkArrivedDeliveriesForBus({ busId: bus.id, gpsLat: nextPoint[0], gpsLng: nextPoint[1], destinationName: currentBus.destination });
                   
                   if (busPathProgress[currentBus.id]) {
                     busPathProgress[currentBus.id].index = nextIndex;
@@ -2088,7 +2208,29 @@ if (require.main === module) {
 
 // Health check
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', message: 'TRANSPO HUB API Running' });
+  const mem = process.memoryUsage ? process.memoryUsage() : null;
+  res.json({
+    status: 'OK',
+    message: 'TRANSPO HUB API Running',
+    uptimeSeconds: Number.isFinite(process.uptime?.()) ? Math.floor(process.uptime()) : null,
+    memory: mem
+      ? {
+          rss: mem.rss,
+          heapTotal: mem.heapTotal,
+          heapUsed: mem.heapUsed,
+          external: mem.external,
+        }
+      : null,
+    osrm: {
+      cache: osrmCache.stats(),
+      inFlight: osrmInFlight.size,
+      fetchErrors: osrmFetchStats.fetchErrors,
+      timeouts: osrmFetchStats.timeouts,
+      lastErrorAt: osrmFetchStats.lastErrorAt,
+      lastTimeoutAt: osrmFetchStats.lastTimeoutAt,
+      failureStreak: osrmFailureStreak,
+    },
+  });
 });
 
 app.use((req, res) => {
