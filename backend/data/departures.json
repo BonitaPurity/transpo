@@ -1,0 +1,281 @@
+{
+  "meta": {
+    "entity": "departures",
+    "version": 1,
+    "createdAt": "2026-01-01T00:00:00.000Z",
+    "updatedAt": "2026-04-27T18:31:32.756Z",
+    "checksum": "8b8946881fb0a9a8a94d056113c590668e1bfdb5366229c5b0119bef62f35697"
+  },
+  "records": [
+    {
+      "id": "dep_sch_01_2026-04-27",
+      "scheduleId": "sch_01",
+      "busId": "bus_1",
+      "travelDate": "2026-04-27",
+      "status": "Scheduled",
+      "seatCapacity": 45,
+      "occupiedSeats": 0,
+      "createdAt": "2026-04-27T18:31:32.743Z"
+    },
+    {
+      "id": "dep_sch_02_2026-04-27",
+      "scheduleId": "sch_02",
+      "busId": "bus_2",
+      "travelDate": "2026-04-27",
+      "status": "Scheduled",
+      "seatCapacity": 45,
+      "occupiedSeats": 0,
+      "createdAt": "2026-04-27T18:31:32.743Z"
+    },
+    {
+      "id": "dep_sch_03_2026-04-27",
+      "scheduleId": "sch_03",
+      "busId": "bus_3",
+      "travelDate": "2026-04-27",
+      "status": "Scheduled",
+      "seatCapacity": 45,
+      "occupiedSeats": 0,
+      "createdAt": "2026-04-27T18:31:32.743Z"
+    },
+    {
+      "id": "dep_sch_04_2026-04-27",
+      "scheduleId": "sch_04",
+      "busId": "bus_4",
+      "travelDate": "2026-04-27",
+      "status": "Scheduled",
+      "seatCapacity": 45,
+      "occupiedSeats": 0,
+      "createdAt": "2026-04-27T18:31:32.743Z"
+    },
+    {
+      "id": "dep_sch_05_2026-04-27",
+      "scheduleId": "sch_05",
+      "busId": "bus_5",
+      "travelDate": "2026-04-27",
+      "status": "Scheduled",
+      "seatCapacity": 45,
+      "occupiedSeats": 0,
+      "createdAt": "2026-04-27T18:31:32.743Z"
+    },
+    {
+      "id": "dep_sch_06_2026-04-27",
+      "scheduleId": "sch_06",
+      "busId": "bus_6",
+      "travelDate": "2026-04-27",
+      "status": "Scheduled",
+      "seatCapacity": 45,
+      "occupiedSeats": 0,
+      "createdAt": "2026-04-27T18:31:32.743Z"
+    },
+    {
+      "id": "dep_sch_07_2026-04-27",
+      "scheduleId": "sch_07",
+      "busId": "bus_7",
+      "travelDate": "2026-04-27",
+      "status": "Scheduled",
+      "seatCapacity": 45,
+      "occupiedSeats": 0,
+      "createdAt": "2026-04-27T18:31:32.743Z"
+    },
+    {
+      "id": "dep_sch_08_2026-04-27",
+      "scheduleId": "sch_08",
+      "busId": "bus_8",
+      "travelDate": "2026-04-27",
+      "status": "Scheduled",
+      "seatCapacity": 45,
+      "occupiedSeats": 0,
+      "createdAt": "2026-04-27T18:31:32.743Z"
+    },
+    {
+      "id": "dep_sch_09_2026-04-27",
+      "scheduleId": "sch_09",
+      "busId": "bus_9",
+      "travelDate": "2026-04-27",
+      "status": "Scheduled",
+      "seatCapacity": 45,
+      "occupiedSeats": 0,
+      "createdAt": "2026-04-27T18:31:32.743Z"
+    },
+    {
+      "id": "dep_sch_01_2026-04-28",
+      "scheduleId": "sch_01",
+      "busId": "bus_1",
+      "travelDate": "2026-04-28",
+      "status": "Scheduled",
+      "seatCapacity": 45,
+      "occupiedSeats": 0,
+      "createdAt": "2026-04-27T18:31:32.743Z"
+    },
+    {
+      "id": "dep_sch_02_2026-04-28",
+      "scheduleId": "sch_02",
+      "busId": "bus_2",
+      "travelDate": "2026-04-28",
+      "status": "Scheduled",
+      "seatCapacity": 45,
+      "occupiedSeats": 0,
+      "createdAt": "2026-04-27T18:31:32.743Z"
+    },
+    {
+      "id": "dep_sch_03_2026-04-28",
+      "scheduleId": "sch_03",
+      "busId": "bus_3",
+      "travelDate": "2026-04-28",
+      "status": "Scheduled",
+      "seatCapacity": 45,
+      "occupiedSeats": 0,
+      "createdAt": "2026-04-27T18:31:32.743Z"
+    },
+    {
+      "id": "dep_sch_04_2026-04-28",
+      "scheduleId": "sch_04",
+      "busId": "bus_4",
+      "travelDate": "2026-04-28",
+      "status": "Scheduled",
+      "seatCapacity": 45,
+      "occupiedSeats": 0,
+      "createdAt": "2026-04-27T18:31:32.743Z"
+    },
+    {
+      "id": "dep_sch_05_2026-04-28",
+      "scheduleId": "sch_05",
+      "busId": "bus_5",
+      "travelDate": "2026-04-28",
+      "status": "Scheduled",
+      "seatCapacity": 45,
+      "occupiedSeats": 0,
+      "createdAt": "2026-04-27T18:31:32.743Z"
+    },
+    {
+      "id": "dep_sch_06_2026-04-28",
+      "scheduleId": "sch_06",
+      "busId": "bus_6",
+      "travelDate": "2026-04-28",
+      "status": "Scheduled",
+      "seatCapacity": 45,
+      "occupiedSeats": 0,
+      "createdAt": "2026-04-27T18:31:32.743Z"
+    },
+    {
+      "id": "dep_sch_07_2026-04-28",
+      "scheduleId": "sch_07",
+      "busId": "bus_7",
+      "travelDate": "2026-04-28",
+      "status": "Scheduled",
+      "seatCapacity": 45,
+      "occupiedSeats": 0,
+      "createdAt": "2026-04-27T18:31:32.743Z"
+    },
+    {
+      "id": "dep_sch_08_2026-04-28",
+      "scheduleId": "sch_08",
+      "busId": "bus_8",
+      "travelDate": "2026-04-28",
+      "status": "Scheduled",
+      "seatCapacity": 45,
+      "occupiedSeats": 0,
+      "createdAt": "2026-04-27T18:31:32.743Z"
+    },
+    {
+      "id": "dep_sch_09_2026-04-28",
+      "scheduleId": "sch_09",
+      "busId": "bus_9",
+      "travelDate": "2026-04-28",
+      "status": "Scheduled",
+      "seatCapacity": 45,
+      "occupiedSeats": 0,
+      "createdAt": "2026-04-27T18:31:32.743Z"
+    },
+    {
+      "id": "dep_sch_01_2026-04-29",
+      "scheduleId": "sch_01",
+      "busId": "bus_1",
+      "travelDate": "2026-04-29",
+      "status": "Scheduled",
+      "seatCapacity": 45,
+      "occupiedSeats": 0,
+      "createdAt": "2026-04-27T18:31:32.743Z"
+    },
+    {
+      "id": "dep_sch_02_2026-04-29",
+      "scheduleId": "sch_02",
+      "busId": "bus_2",
+      "travelDate": "2026-04-29",
+      "status": "Scheduled",
+      "seatCapacity": 45,
+      "occupiedSeats": 0,
+      "createdAt": "2026-04-27T18:31:32.743Z"
+    },
+    {
+      "id": "dep_sch_03_2026-04-29",
+      "scheduleId": "sch_03",
+      "busId": "bus_3",
+      "travelDate": "2026-04-29",
+      "status": "Scheduled",
+      "seatCapacity": 45,
+      "occupiedSeats": 0,
+      "createdAt": "2026-04-27T18:31:32.743Z"
+    },
+    {
+      "id": "dep_sch_04_2026-04-29",
+      "scheduleId": "sch_04",
+      "busId": "bus_4",
+      "travelDate": "2026-04-29",
+      "status": "Scheduled",
+      "seatCapacity": 45,
+      "occupiedSeats": 0,
+      "createdAt": "2026-04-27T18:31:32.743Z"
+    },
+    {
+      "id": "dep_sch_05_2026-04-29",
+      "scheduleId": "sch_05",
+      "busId": "bus_5",
+      "travelDate": "2026-04-29",
+      "status": "Scheduled",
+      "seatCapacity": 45,
+      "occupiedSeats": 0,
+      "createdAt": "2026-04-27T18:31:32.743Z"
+    },
+    {
+      "id": "dep_sch_06_2026-04-29",
+      "scheduleId": "sch_06",
+      "busId": "bus_6",
+      "travelDate": "2026-04-29",
+      "status": "Scheduled",
+      "seatCapacity": 45,
+      "occupiedSeats": 0,
+      "createdAt": "2026-04-27T18:31:32.743Z"
+    },
+    {
+      "id": "dep_sch_07_2026-04-29",
+      "scheduleId": "sch_07",
+      "busId": "bus_7",
+      "travelDate": "2026-04-29",
+      "status": "Scheduled",
+      "seatCapacity": 45,
+      "occupiedSeats": 0,
+      "createdAt": "2026-04-27T18:31:32.743Z"
+    },
+    {
+      "id": "dep_sch_08_2026-04-29",
+      "scheduleId": "sch_08",
+      "busId": "bus_8",
+      "travelDate": "2026-04-29",
+      "status": "Scheduled",
+      "seatCapacity": 45,
+      "occupiedSeats": 0,
+      "createdAt": "2026-04-27T18:31:32.743Z"
+    },
+    {
+      "id": "dep_sch_09_2026-04-29",
+      "scheduleId": "sch_09",
+      "busId": "bus_9",
+      "travelDate": "2026-04-29",
+      "status": "Scheduled",
+      "seatCapacity": 45,
+      "occupiedSeats": 0,
+      "createdAt": "2026-04-27T18:31:32.743Z"
+    }
+  ]
+}

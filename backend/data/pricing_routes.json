@@ -2,14 +2,40 @@
   "meta": {
     "entity": "pricing_routes",
     "version": 1,
-    "createdAt": "2026-04-22T20:35:43.997Z",
-    "updatedAt": "2026-04-27T11:02:55.020Z",
-    "checksum": "bdc954858e5bc11c2f16caaf3945641f7e5cca482fded80e06d383314308c32d"
+    "createdAt": "2026-01-01T00:00:00.000Z",
+    "updatedAt": "2026-04-27T18:31:32.758Z",
+    "checksum": "ab13688071f3157bb3e2a911aa8dba8ad3ac8a7b556804335048fd93bb394143"
   },
   "records": [
     {
       "id": "r1",
       "tag": "NMV-001",
+      "hub": "Namanve",
+      "hubCode": "NMV",
+      "destination": "Jinja",
+      "distance": "80 km",
+      "currentPrice": 20000,
+      "basePrice": 20000,
+      "peakSurcharge": 4000,
+      "isPeak": false,
+      "color": "#facc15"
+    },
+    {
+      "id": "r2",
+      "tag": "NMV-014",
+      "hub": "Namanve",
+      "hubCode": "NMV",
+      "destination": "Mbale",
+      "distance": "230 km",
+      "currentPrice": 35000,
+      "basePrice": 35000,
+      "peakSurcharge": 7000,
+      "isPeak": false,
+      "color": "#facc15"
+    },
+    {
+      "id": "r3",
+      "tag": "NMV-028",
       "hub": "Namanve",
       "hubCode": "NMV",
       "destination": "Entebbe",
@@ -21,41 +47,15 @@
       "color": "#facc15"
     },
     {
-      "id": "r2",
-      "tag": "NMV-014",
-      "hub": "Namanve",
-      "hubCode": "NMV",
-      "destination": "Jinja",
-      "distance": "80 km",
-      "currentPrice": 25000,
-      "basePrice": 22000,
-      "peakSurcharge": 5000,
-      "isPeak": true,
-      "color": "#facc15"
-    },
-    {
-      "id": "r3",
-      "tag": "NMV-028",
-      "hub": "Namanve",
-      "hubCode": "NMV",
-      "destination": "Mbale",
-      "distance": "230 km",
-      "currentPrice": 45000,
-      "basePrice": 40000,
-      "peakSurcharge": 10000,
-      "isPeak": false,
-      "color": "#facc15"
-    },
-    {
       "id": "r4",
       "tag": "BSG-003",
       "hub": "Busega",
       "hubCode": "BSG",
-      "destination": "Masaka",
-      "distance": "135 km",
-      "currentPrice": 35000,
-      "basePrice": 30000,
-      "peakSurcharge": 7000,
+      "destination": "Mbarara",
+      "distance": "270 km",
+      "currentPrice": 40000,
+      "basePrice": 40000,
+      "peakSurcharge": 8000,
       "isPeak": false,
       "color": "#38bdf8"
     },
@@ -64,12 +64,12 @@
       "tag": "BSG-011",
       "hub": "Busega",
       "hubCode": "BSG",
-      "destination": "Mbarara",
-      "distance": "270 km",
-      "currentPrice": 45000,
-      "basePrice": 42000,
-      "peakSurcharge": 8000,
-      "isPeak": true,
+      "destination": "Kabale",
+      "distance": "415 km",
+      "currentPrice": 50000,
+      "basePrice": 50000,
+      "peakSurcharge": 10000,
+      "isPeak": false,
       "color": "#38bdf8"
     },
     {
@@ -80,8 +80,8 @@
       "destination": "Fort Portal",
       "distance": "320 km",
       "currentPrice": 55000,
-      "basePrice": 50000,
-      "peakSurcharge": 12000,
+      "basePrice": 55000,
+      "peakSurcharge": 11000,
       "isPeak": false,
       "color": "#38bdf8"
     },
@@ -92,10 +92,10 @@
       "hubCode": "KWP",
       "destination": "Gulu",
       "distance": "340 km",
-      "currentPrice": 55000,
-      "basePrice": 50000,
-      "peakSurcharge": 10000,
-      "isPeak": true,
+      "currentPrice": 60000,
+      "basePrice": 60000,
+      "peakSurcharge": 12000,
+      "isPeak": false,
       "color": "#fb923c"
     },
     {
@@ -106,7 +106,7 @@
       "destination": "Arua",
       "distance": "490 km",
       "currentPrice": 75000,
-      "basePrice": 70000,
+      "basePrice": 75000,
       "peakSurcharge": 15000,
       "isPeak": false,
       "color": "#fb923c"
@@ -119,7 +119,7 @@
       "destination": "Hoima",
       "distance": "220 km",
       "currentPrice": 40000,
-      "basePrice": 36000,
+      "basePrice": 40000,
       "peakSurcharge": 8000,
       "isPeak": false,
       "color": "#fb923c"

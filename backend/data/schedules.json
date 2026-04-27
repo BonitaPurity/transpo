@@ -2,13 +2,46 @@
   "meta": {
     "entity": "schedules",
     "version": 1,
-    "createdAt": "2026-04-22T20:35:43.972Z",
-    "updatedAt": "2026-04-27T11:02:54.992Z",
-    "checksum": "25930c04beb17577645f6af817f9690c677b4d97211e13ba2240ee6bd7e6abbc"
+    "createdAt": "2026-01-01T00:00:00.000Z",
+    "updatedAt": "2026-04-27T18:31:32.756Z",
+    "checksum": "ecd3071bac8cf13d7431b9afa4279fffae5ce43b44841b6bad87d4ea32dbb4a5"
   },
   "records": [
     {
       "id": "sch_01",
+      "hubId": "hub_east",
+      "destination": "Jinja",
+      "departureTime": "08:00 AM",
+      "status": "On Time",
+      "price": 20000,
+      "busType": "Kayoola EVS (Electric)",
+      "duration": "1.5 hrs",
+      "seatsAvailable": 45
+    },
+    {
+      "id": "sch_02",
+      "hubId": "hub_east",
+      "destination": "Mbale",
+      "departureTime": "09:15 AM",
+      "status": "On Time",
+      "price": 35000,
+      "busType": "Standard",
+      "duration": "4.5 hrs",
+      "seatsAvailable": 45
+    },
+    {
+      "id": "sch_03",
+      "hubId": "hub_east",
+      "destination": "Entebbe",
+      "departureTime": "10:00 AM",
+      "status": "On Time",
+      "price": 15000,
+      "busType": "Kayoola EVS (Electric)",
+      "duration": "1 hr",
+      "seatsAvailable": 45
+    },
+    {
+      "id": "sch_04",
       "hubId": "hub_west",
       "destination": "Mbarara",
       "departureTime": "08:00 AM",
@@ -19,7 +52,7 @@
       "seatsAvailable": 45
     },
     {
-      "id": "sch_02",
+      "id": "sch_05",
       "hubId": "hub_west",
       "destination": "Kabale",
       "departureTime": "08:30 AM",
@@ -27,32 +60,21 @@
       "price": 50000,
       "busType": "Standard",
       "duration": "7 hrs",
-      "seatsAvailable": 12
+      "seatsAvailable": 45
     },
     {
-      "id": "sch_03",
-      "hubId": "hub_east",
-      "destination": "Jinja",
+      "id": "sch_06",
+      "hubId": "hub_west",
+      "destination": "Fort Portal",
       "departureTime": "09:00 AM",
       "status": "On Time",
-      "price": 20000,
-      "busType": "Kayoola EVS (Electric)",
-      "duration": "1.5 hrs",
-      "seatsAvailable": 50
-    },
-    {
-      "id": "sch_04",
-      "hubId": "hub_east",
-      "destination": "Mbale",
-      "departureTime": "09:15 AM",
-      "status": "Delayed",
-      "price": 35000,
+      "price": 55000,
       "busType": "Standard",
-      "duration": "4.5 hrs",
-      "seatsAvailable": 8
+      "duration": "6 hrs",
+      "seatsAvailable": 45
     },
     {
-      "id": "sch_05",
+      "id": "sch_07",
       "hubId": "hub_north",
       "destination": "Gulu",
       "departureTime": "08:00 AM",
@@ -60,10 +82,10 @@
       "price": 60000,
       "busType": "Standard",
       "duration": "6 hrs",
-      "seatsAvailable": 25
+      "seatsAvailable": 45
     },
     {
-      "id": "sch_06",
+      "id": "sch_08",
       "hubId": "hub_north",
       "destination": "Arua",
       "departureTime": "09:30 AM",
@@ -71,17 +93,17 @@
       "price": 75000,
       "busType": "Standard",
       "duration": "8 hrs",
-      "seatsAvailable": 40
+      "seatsAvailable": 45
     },
     {
-      "id": "sch_448159",
-      "hubId": "hub_east",
-      "destination": "Jinja",
-      "departureTime": "11:00 AM",
-      "status": "Active",
-      "price": 20000,
-      "busType": "Kayoola EVS (Electric)",
-      "duration": "1.5 hrs",
+      "id": "sch_09",
+      "hubId": "hub_north",
+      "destination": "Hoima",
+      "departureTime": "10:00 AM",
+      "status": "On Time",
+      "price": 40000,
+      "busType": "Standard",
+      "duration": "5 hrs",
       "seatsAvailable": 45
     }
   ]
