@@ -1,0 +1,81 @@
+{
+  "meta": {
+    "entity": "bus_fares",
+    "version": 1,
+    "createdAt": "2026-04-22T20:35:43.999Z",
+    "updatedAt": "2026-04-27T09:53:07.511Z",
+    "checksum": "5e9161071acee25ca1e95fa72e0423861f01e3a10585308fb5de30dc3f05401d"
+  },
+  "records": [
+    {
+      "id": "fare_753095",
+      "busId": "bus_1",
+      "fareAmount": 15000,
+      "createdAt": "2026-04-22T20:35:44.340Z",
+      "updatedAt": "2026-04-22T20:35:44.340Z"
+    },
+    {
+      "id": "fare_376641",
+      "busId": "bus_2",
+      "fareAmount": 15000,
+      "createdAt": "2026-04-22T20:35:44.340Z",
+      "updatedAt": "2026-04-22T20:35:44.340Z"
+    },
+    {
+      "id": "fare_494762",
+      "busId": "bus_3",
+      "fareAmount": 15000,
+      "createdAt": "2026-04-22T20:35:44.340Z",
+      "updatedAt": "2026-04-22T20:35:44.340Z"
+    },
+    {
+      "id": "fare_657728",
+      "busId": "bus_4",
+      "fareAmount": 25000,
+      "createdAt": "2026-04-22T20:35:44.340Z",
+      "updatedAt": "2026-04-27T09:51:00.961Z"
+    },
+    {
+      "id": "fare_753573",
+      "busId": "bus_5",
+      "fareAmount": 15000,
+      "createdAt": "2026-04-22T20:35:44.340Z",
+      "updatedAt": "2026-04-22T20:35:44.340Z"
+    },
+    {
+      "id": "fare_795251",
+      "busId": "bus_6",
+      "fareAmount": 25000,
+      "createdAt": "2026-04-22T20:35:44.340Z",
+      "updatedAt": "2026-04-27T09:53:07.511Z"
+    },
+    {
+      "id": "fare_293756",
+      "busId": "bus_7",
+      "fareAmount": 15000,
+      "createdAt": "2026-04-22T20:35:44.340Z",
+      "updatedAt": "2026-04-22T20:35:44.340Z"
+    },
+    {
+      "id": "fare_592090",
+      "busId": "bus_8",
+      "fareAmount": 15000,
+      "createdAt": "2026-04-22T20:35:44.340Z",
+      "updatedAt": "2026-04-22T20:35:44.340Z"
+    },
+    {
+      "id": "fare_307482",
+      "busId": "bus_9",
+      "fareAmount": 15000,
+      "createdAt": "2026-04-22T20:35:44.340Z",
+      "updatedAt": "2026-04-22T20:35:44.340Z"
+    },
+    {
+      "id": "fare_519155",
+      "busId": "bus_878503",
+      "fareAmount": 55000,
+      "createdAt": "2026-04-27T07:04:16.909Z",
+      "updatedAt": "2026-04-27T09:51:18.491Z"
+    }
+  ]
+}

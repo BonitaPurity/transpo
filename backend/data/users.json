@@ -1,0 +1,47 @@
+{
+  "meta": {
+    "entity": "users",
+    "version": 1,
+    "createdAt": "2026-01-01T00:00:00.000Z",
+    "updatedAt": "2026-01-01T00:00:00.000Z",
+    "checksum": "acfbfe22e90a0444a613f56b77bdeb95fcc7ab2208e3317ce41696e462f853d5"
+  },
+  "records": [
+    {
+      "id": "usr_100001",
+      "name": "Admin",
+      "email": "admin@transpo.ug",
+      "phone": "N/A",
+      "password": "$2a$10$dcD1Mo6slodCbVHC7whfCOYKBeIS0BamzYFswbMYwfRMF4Qxm7uey",
+      "role": "admin",
+      "createdAt": "2026-01-01T00:00:00.000Z",
+      "updatedAt": "2026-01-01T00:00:00.000Z",
+      "accessCount": 0,
+      "lastAccessAt": null
+    },
+    {
+      "id": "usr_100002",
+      "name": "Ops",
+      "email": "ops@transpo.ug",
+      "phone": "N/A",
+      "password": "$2a$10$of3UAyV5mWpQUIx1mSp/E.Ovgn3B9bpFIBJuj9kfj5pMk3Y3MNEcu",
+      "role": "admin",
+      "createdAt": "2026-01-01T00:00:00.000Z",
+      "updatedAt": "2026-01-01T00:00:00.000Z",
+      "accessCount": 0,
+      "lastAccessAt": null
+    },
+    {
+      "id": "usr_100003",
+      "name": "Dispatch",
+      "email": "dispatch@transpo.ug",
+      "phone": "N/A",
+      "password": "$2a$10$fBLv4dELRN7.Bd8NguDGeuo7NlwjygAlApqWlahVYS671VeDM29rG",
+      "role": "admin",
+      "createdAt": "2026-01-01T00:00:00.000Z",
+      "updatedAt": "2026-01-01T00:00:00.000Z",
+      "accessCount": 0,
+      "lastAccessAt": null
+    }
+  ]
+}

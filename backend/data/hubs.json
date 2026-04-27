@@ -1,0 +1,41 @@
+{
+  "meta": {
+    "entity": "hubs",
+    "version": 1,
+    "createdAt": "2026-04-22T20:35:43.970Z",
+    "updatedAt": "2026-04-22T20:35:44.013Z",
+    "checksum": "39214e55d845cac546ea66ce56328ed3da1a43a05d22320962617131793ecd84"
+  },
+  "records": [
+    {
+      "id": "hub_east",
+      "name": "Namanve Hub (East)",
+      "region": "East/Jinja Route",
+      "capacity": "150 buses/day",
+      "lat": 0.3521,
+      "lng": 32.5915,
+      "color": "#facc15",
+      "code": "NMV"
+    },
+    {
+      "id": "hub_west",
+      "name": "Busega Hub (West)",
+      "region": "West/Mbarara Route",
+      "capacity": "200 buses/day",
+      "lat": -0.3127,
+      "lng": 31.7138,
+      "color": "#38bdf8",
+      "code": "BSG"
+    },
+    {
+      "id": "hub_north",
+      "name": "Kawempe Hub (North)",
+      "region": "North/Gulu Route",
+      "capacity": "120 buses/day",
+      "lat": 0.4502,
+      "lng": 33.1998,
+      "color": "#fb923c",
+      "code": "KWP"
+    }
+  ]
+}

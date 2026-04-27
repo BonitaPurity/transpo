@@ -16,8 +16,17 @@ frontend/out/
 backend/.env.production
 frontend/.env.production
 
-# Backend database
-backend/data/
+# Backend database — ignore runtime data but keep seed files
+backend/data/_backups/
+backend/data/*.tmp
+# Keep the seed data files (users, buses, etc.)
+!backend/data/users.json
+!backend/data/buses.json
+!backend/data/hubs.json
+!backend/data/schedules.json
+!backend/data/bus_fares.json
+!backend/data/pricing_routes.json
+!backend/data/delivery_fees.json
 
 # Logs
 npm-debug.log*
