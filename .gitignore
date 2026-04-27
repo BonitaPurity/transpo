@@ -10,6 +10,11 @@ frontend/out/
 # Local environment files
 .env
 .env.*
+!.env.example
+!.env.local.example
+# Production env files contain secrets - never commit
+backend/.env.production
+frontend/.env.production
 
 # Backend database
 backend/data/
