@@ -12,14 +12,9 @@ function shouldUsePostgres() {
 
 function createStore({ logger } = {}) {
   const mode = String(process.env.DB_MODE || '').toLowerCase();
-  const allowJsonInProd = String(process.env.ALLOW_JSON_IN_PROD || '').toLowerCase() === 'true';
   if (process.env.NODE_ENV === 'production') {
-    if (mode === 'json' || mode === 'json-files') {
-      if (!allowJsonInProd) {
-        throw new Error('Refusing to start with JSON storage in production. Set DB_MODE=postgres and DATABASE_URL.');
-      }
-    } else if (!process.env.DATABASE_URL) {
-      throw new Error('DATABASE_URL must be set in production (Render Postgres).');
+    if ((mode === 'postgres' || mode === 'pg') && !process.env.DATABASE_URL) {
+      throw new Error('DATABASE_URL must be set when DB_MODE=postgres in production.');
     }
   }
 
