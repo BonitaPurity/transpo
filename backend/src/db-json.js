@@ -190,6 +190,27 @@ async function initDb() {
     return changed ? { __write: true, value: true } : { value: true };
   });
 
+  // Always seed admin accounts regardless of seedDemo/seedBase flags
+  const adminSeeds = [
+    { email: 'admin@transpo.ug', password: 'admin123' },
+    { email: 'ops@transpo.ug', password: 'ops2024' },
+    { email: 'dispatch@transpo.ug', password: 'dispatch1' },
+  ];
+  for (const admin of adminSeeds) {
+    const existing = await findUserByEmail(admin.email);
+    if (!existing) {
+      const name = admin.email.split('@')[0].replace(/^\w/, (c) => c.toUpperCase());
+      await createUser({
+        name,
+        email: admin.email,
+        phone: 'N/A',
+        password: admin.password,
+        role: 'admin',
+      });
+      console.log(`[Seed] Created admin account: ${admin.email}`);
+    }
+  }
+
   if (seedDemo) {
   const scheduleSeeds = [
     ['sch_01', 'hub_west', 'Mbarara', '08:00 AM', 'On Time', 40000, 'Kayoola EVS (Electric)', '4 hrs', 45],
@@ -286,25 +307,6 @@ async function initDb() {
     }
     return { __write: true, value: true };
   });
-
-  const admins = [
-    { email: 'admin@transpo.ug', password: 'admin123' },
-    { email: 'ops@transpo.ug', password: 'ops2024' },
-    { email: 'dispatch@transpo.ug', password: 'dispatch1' },
-  ];
-  for (const admin of admins) {
-    const existing = await findUserByEmail(admin.email);
-    if (!existing) {
-      const name = admin.email.split('@')[0].replace(/^\w/, (c) => c.toUpperCase());
-      await createUser({
-        name,
-        email: admin.email,
-        phone: 'N/A',
-        password: admin.password,
-        role: 'admin',
-      });
-    }
-  }
 
   const dateStr = (d) => d.toISOString().slice(0, 10);
   const today = new Date();
