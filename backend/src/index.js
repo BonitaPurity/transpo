@@ -2353,6 +2353,7 @@ async function startSimulation() {
     if (stopped) return;
     try {
       const buses = await db.getBuses();
+      if (!buses || buses.length === 0) return; // nothing to simulate
       
       // Process bus positions sequentially to handle async awaits properly
       for (const bus of buses) {

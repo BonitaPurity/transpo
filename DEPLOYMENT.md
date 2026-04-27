@@ -47,29 +47,27 @@
 
 ### 2.2 Set Environment Variables
 
-In the Render dashboard → your web service → **Environment** tab, add each variable from `backend/.env.production`:
+In the Render dashboard → your web service → **Environment** tab, add each variable:
 
 | Variable | Value |
 |----------|-------|
 | `NODE_ENV` | `production` |
-| `PORT` | `5000` |
 | `JWT_SECRET` | *(copy from `backend/.env.production`)* |
 | `REFRESH_TOKEN_SECRET` | *(copy from `backend/.env.production`)* |
 | `JWT_EXPIRES_IN` | `2h` |
 | `REFRESH_TOKEN_EXPIRES_IN` | `14d` |
-| `DATABASE_URL` | *(paste Internal Database URL from Step 1)* |
-| `DB_MODE` | `postgres` |
-| `DATABASE_SSL` | `true` |
-| `DATABASE_SSL_REJECT_UNAUTHORIZED` | `false` |
-| `DATABASE_POOL_MAX` | `10` |
-| `CORS_ORIGINS` | `https://transpo-hub.vercel.app` *(update after Vercel deploy)* |
+| `DB_MODE` | `json` |
+| `JSON_STORAGE_DIR` | `./data` |
+| `ALLOW_JSON_IN_PROD` | `true` |
+| `SEED_BASE_DATA` | `true` |
+| `JSON_SEED_DEMO_DATA` | `true` |
+| `CORS_ORIGINS` | `https://your-app.vercel.app` *(update after Vercel deploy)* |
 | `CORS_ALLOW_ALL` | `false` |
-| `SEED_BASE_DATA` | `true` *(set to false after first deploy)* |
-| `JSON_SEED_DEMO_DATA` | `false` |
 | `ENFORCE_HTTPS` | `true` |
 | `ADMIN_BYPASS_AUTH_ENABLED` | `false` |
-| `SIM_INTERVAL_MS` | `1000` |
-| `DELIVERY_GEOFENCE_METERS` | `200` |
+| `SIM_INTERVAL_MS` | `4000` |
+
+> **Do NOT set `PORT`** — Render assigns it automatically.
 
 ### 2.3 Deploy
 
@@ -229,16 +227,17 @@ node -e "require('dotenv').config();const {createStore}=require('./src/storage/s
 | `REFRESH_TOKEN_SECRET` | Yes | 96-char hex string — never share |
 | `JWT_EXPIRES_IN` | Yes | `2h` recommended |
 | `REFRESH_TOKEN_EXPIRES_IN` | Yes | `14d` recommended |
-| `DATABASE_URL` | Yes | Render Internal PostgreSQL URL |
-| `DB_MODE` | Yes | `postgres` |
-| `DATABASE_SSL` | Yes | `true` for Render |
-| `DATABASE_SSL_REJECT_UNAUTHORIZED` | Yes | `false` for Render |
+| `DATABASE_URL` | No | Only needed if using postgres mode |
+| `DB_MODE` | Yes | `json` (free tier) or `postgres` (paid) |
+| `ALLOW_JSON_IN_PROD` | Yes | `true` when using json mode |
+| `JSON_STORAGE_DIR` | Yes | `./data` |
+| `SEED_BASE_DATA` | Yes | `true` on first deploy, then `false` |
+| `JSON_SEED_DEMO_DATA` | Yes | `true` to seed buses/schedules/demo data |
 | `CORS_ORIGINS` | Yes | Your Vercel frontend URL |
 | `CORS_ALLOW_ALL` | Yes | `false` |
-| `SEED_BASE_DATA` | First deploy only | `true` then set to `false` |
 | `ENFORCE_HTTPS` | Yes | `true` |
-| `SIM_INTERVAL_MS` | No | `1000` (Postgres mode) |
-| `DELIVERY_GEOFENCE_METERS` | No | `200` |
+| `ADMIN_BYPASS_AUTH_ENABLED` | Yes | `false` |
+| `SIM_INTERVAL_MS` | No | `4000` for json mode |
 
 ### Frontend (Vercel)
 
