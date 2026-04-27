@@ -2342,10 +2342,10 @@ async function autoMarkArrivedDeliveriesForBus({ busId, gpsLat, gpsLng, destinat
 }
 
 // Use a slower interval for JSON file storage to avoid .tmp file accumulation.
-// Postgres can handle 1s; JSON files need breathing room (4s default).
+// Postgres free tier (Render) has limited connections — use 5s to avoid exhausting the pool.
 const SIM_INTERVAL_MS = process.env.SIM_INTERVAL_MS
   ? Math.max(500, Number(process.env.SIM_INTERVAL_MS))
-  : (db.getDbMode() === 'postgres' ? 1000 : 4000);
+  : (db.getDbMode() === 'postgres' ? 5000 : 4000);
 
 async function startSimulation() {
   let stopped = false;

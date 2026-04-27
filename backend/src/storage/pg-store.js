@@ -33,9 +33,9 @@ class PgStore {
     this.pool = options.pool || new Pool({
       connectionString: this.databaseUrl,
       ssl: sslEnabled ? { rejectUnauthorized } : false,
-      max: Number(process.env.DATABASE_POOL_MAX || 10),
-      idleTimeoutMillis: Number(process.env.DATABASE_POOL_IDLE_MS || 30000),
-      connectionTimeoutMillis: Number(process.env.DATABASE_POOL_CONN_TIMEOUT_MS || 10000),
+      max: Number(process.env.DATABASE_POOL_MAX || 5),
+      idleTimeoutMillis: Number(process.env.DATABASE_POOL_IDLE_MS || 10000),
+      connectionTimeoutMillis: Number(process.env.DATABASE_POOL_CONN_TIMEOUT_MS || 15000),
     });
     this.mode = 'postgres';
     this._als = new AsyncLocalStorage();
