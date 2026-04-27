@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node src/index.js",
     "migrate": "node src/migrate.js",
+    "seed-admin": "node scripts/seed-admin.js",
     "test": "jest --runInBand"
   },
   "keywords": [],

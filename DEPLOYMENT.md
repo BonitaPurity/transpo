@@ -163,7 +163,46 @@ After first login, go to **Admin** → **Users** and change the default admin pa
 
 ---
 
-## Step 5 — Custom Domain (Optional)
+## Step 5 — Admin Credentials & Password Reset
+
+### Default Credentials (seeded on first boot)
+
+| Name | Email | Password |
+|------|-------|----------|
+| Admin | `admin@transpo.ug` | `admin123` |
+| Ops | `ops@transpo.ug` | `ops2024` |
+| Dispatch | `dispatch@transpo.ug` | `dispatch1` |
+
+These are created automatically when `SEED_BASE_DATA=true` on first boot.
+
+### If Login Fails in Production
+
+The most common cause is the admin accounts were not seeded. Fix it using the Render Shell:
+
+1. Go to Render → your backend service → **Shell** tab
+2. Run:
+```bash
+node scripts/seed-admin.js
+```
+This creates all three admin accounts if they don't exist yet.
+
+### Reset a Specific Admin Password
+
+In the Render Shell:
+```bash
+ADMIN_EMAIL=admin@transpo.ug ADMIN_PASSWORD=YourNewPassword123 node scripts/seed-admin.js
+```
+
+### Verify Accounts Exist
+
+In the Render Shell:
+```bash
+node -e "require('dotenv').config();const {createStore}=require('./src/storage/store');const s=createStore({logger:console});s.init().then(()=>s.readAll('users')).then(u=>{u.forEach(x=>console.log(x.id,x.email,x.role));process.exit(0);})"
+```
+
+---
+
+## Step 6 — Custom Domain (Optional)
 
 ### Vercel
 1. Go to your Vercel project → **Settings** → **Domains**
