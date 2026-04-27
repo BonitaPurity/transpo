@@ -224,7 +224,7 @@ node -e "require('dotenv').config();const {createStore}=require('./src/storage/s
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `NODE_ENV` | Yes | Must be `production` |
-| `PORT` | Yes | `5000` |
+| `PORT` | No | **Do NOT set** — Render assigns this automatically |
 | `JWT_SECRET` | Yes | 96-char hex string — never share |
 | `REFRESH_TOKEN_SECRET` | Yes | 96-char hex string — never share |
 | `JWT_EXPIRES_IN` | Yes | `2h` recommended |

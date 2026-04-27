@@ -2348,7 +2348,9 @@ const SIM_INTERVAL_MS = process.env.SIM_INTERVAL_MS
   : (db.getDbMode() === 'postgres' ? 1000 : 4000);
 
 async function startSimulation() {
-  setInterval(async () => {
+  let stopped = false;
+  const handle = setInterval(async () => {
+    if (stopped) return;
     try {
       const buses = await db.getBuses();
       
@@ -2406,8 +2408,11 @@ async function startSimulation() {
               const fetched = await getOrFetchOSRMRoute(currentBus.gpsLat, currentBus.gpsLng, dest.lat, dest.lng);
               if (fetched) {
                   currentPath = fetched;
-                  busPathProgress[currentBus.id].path = currentPath;
-                  busPathProgress[currentBus.id].index = 0;
+                  // Guard: entry may have been deleted by another tick
+                  if (busPathProgress[currentBus.id]) {
+                    busPathProgress[currentBus.id].path = currentPath;
+                    busPathProgress[currentBus.id].index = 0;
+                  }
               }
           }
 
@@ -2509,9 +2514,14 @@ async function startSimulation() {
       const updatedBuses = await db.getBuses();
       io.emit('fleet_update', updatedBuses);
     } catch (err) {
+      if (String(err?.message || '').includes('pool after calling end')) {
+        stopped = true;
+        return;
+      }
       console.error('Simulation step error:', err);
     }
   }, SIM_INTERVAL_MS);
+  return handle;
 }
 
 // Global start
@@ -2556,7 +2566,7 @@ async function bootstrap() {
             }, 60000);
 
             console.log(`Simulation interval: ${SIM_INTERVAL_MS}ms`);
-            startSimulation();
+            const simHandle = startSimulation();
             server.listen(PORT, () => {
                 console.log(`Backend server running on port ${PORT} (${useHttps ? 'https' : 'http'}) with Real-Time Nexus (Socket.io) active`);
             });
@@ -2564,6 +2574,8 @@ async function bootstrap() {
             const shutdown = async (signal) => {
                 try {
                     console.log(`Received ${signal}. Shutting down...`);
+                    // Stop simulation first so no more DB calls are made
+                    clearInterval(await simHandle);
                     await new Promise((resolve) => server.close(resolve));
                     try { io.close(); } catch {}
                     await db.closePool();
