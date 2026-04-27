@@ -25,3 +25,13 @@ yarn-error.log*
 # OS files
 .DS_Store
 Thumbs.db
+
+# Root-level utility/test scripts
+api_test.ps1
+check_hash.js
+fix_checksum.js
+gen_hash.js
+reset_admin_password.js
+smoke_test.ps1
+verify_*.ps1
+preview.html
