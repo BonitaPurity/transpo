@@ -212,62 +212,55 @@ async function initDb() {
   }
 
   if (seedDemo) {
+  // ── Schedules (match bus destinations exactly) ──────────────────────────────
   const scheduleSeeds = [
-    ['sch_01', 'hub_west', 'Mbarara', '08:00 AM', 'On Time', 40000, 'Kayoola EVS (Electric)', '4 hrs', 45],
-    ['sch_02', 'hub_west', 'Kabale', '08:30 AM', 'On Time', 50000, 'Standard', '7 hrs', 12],
-    ['sch_03', 'hub_east', 'Jinja', '09:00 AM', 'On Time', 20000, 'Kayoola EVS (Electric)', '1.5 hrs', 50],
-    ['sch_04', 'hub_east', 'Mbale', '09:15 AM', 'Delayed', 35000, 'Standard', '4.5 hrs', 8],
-    ['sch_05', 'hub_north', 'Gulu', '08:00 AM', 'On Time', 60000, 'Standard', '6 hrs', 25],
-    ['sch_06', 'hub_north', 'Arua', '09:30 AM', 'On Time', 75000, 'Standard', '8 hrs', 40],
+    ['sch_01', 'hub_east',  'Jinja',       '08:00 AM', 'On Time', 20000, 'Kayoola EVS (Electric)', '1.5 hrs', 45],
+    ['sch_02', 'hub_east',  'Mbale',       '09:15 AM', 'On Time', 35000, 'Standard',               '4.5 hrs', 45],
+    ['sch_03', 'hub_east',  'Entebbe',     '10:00 AM', 'On Time', 15000, 'Kayoola EVS (Electric)', '1 hr',    45],
+    ['sch_04', 'hub_west',  'Mbarara',     '08:00 AM', 'On Time', 40000, 'Kayoola EVS (Electric)', '4 hrs',   45],
+    ['sch_05', 'hub_west',  'Kabale',      '08:30 AM', 'On Time', 50000, 'Standard',               '7 hrs',   45],
+    ['sch_06', 'hub_west',  'Fort Portal', '09:00 AM', 'On Time', 55000, 'Standard',               '6 hrs',   45],
+    ['sch_07', 'hub_north', 'Gulu',        '08:00 AM', 'On Time', 60000, 'Standard',               '6 hrs',   45],
+    ['sch_08', 'hub_north', 'Arua',        '09:30 AM', 'On Time', 75000, 'Standard',               '8 hrs',   45],
+    ['sch_09', 'hub_north', 'Hoima',       '10:00 AM', 'On Time', 40000, 'Standard',               '5 hrs',   45],
   ];
   await withEntityDoc('schedules', async (doc) => {
-    for (const s of scheduleSeeds) {
-      if (doc.records.some((x) => x.id === s[0])) continue;
-      doc.records.push({
-        id: s[0],
-        hubId: s[1],
-        destination: s[2],
-        departureTime: s[3],
-        status: s[4],
-        price: s[5],
-        busType: s[6],
-        duration: s[7],
-        seatsAvailable: s[8],
-      });
-    }
+    // Replace all records to ensure consistency
+    doc.records = scheduleSeeds.map(s => ({
+      id: s[0], hubId: s[1], destination: s[2], departureTime: s[3],
+      status: s[4], price: s[5], busType: s[6], duration: s[7], seatsAvailable: s[8],
+    }));
     return { __write: true, value: true };
   });
 
+  // ── Buses (destinations match schedules) ────────────────────────────────────
   const busSeeds = [
-    ['bus_1', 'NMV-001', 'hub_east', 'Entebbe', 'Active', 65, 78, 0.3521, 32.5915],
-    ['bus_2', 'NMV-014', 'hub_east', 'Jinja', 'En Route', 72, 55, 0.4502, 33.1998],
-    ['bus_3', 'NMV-028', 'hub_east', 'Mbale', 'Active', 55, 90, 1.0827, 34.1750],
-    ['bus_4', 'BSG-003', 'hub_west', 'Masaka', 'En Route', 68, 62, -0.3127, 31.7138],
-    ['bus_5', 'BSG-011', 'hub_west', 'Mbarara', 'Active', 80, 75, -0.6000, 30.6500],
-    ['bus_6', 'BSG-022', 'hub_west', 'Fort Portal', 'Charging', 0, 18, 0.6672, 30.2745],
-    ['bus_7', 'KWP-007', 'hub_north', 'Gulu', 'Active', 78, 88, 2.7667, 32.3050],
-    ['bus_8', 'KWP-015', 'hub_north', 'Arua', 'En Route', 62, 45, 3.0191, 30.9237],
-    ['bus_9', 'KWP-031', 'hub_north', 'Hoima', 'Active', 50, 70, 1.4356, 31.3436],
+    ['bus_1', 'NMV-001', 'hub_east',  'Jinja',       'En Route', 72, 78, 0.4479,  33.2032],
+    ['bus_2', 'NMV-014', 'hub_east',  'Mbale',       'Active',    0, 90, 0.3521,  32.5915],
+    ['bus_3', 'NMV-028', 'hub_east',  'Entebbe',     'Active',    0, 85, 0.3521,  32.5915],
+    ['bus_4', 'BSG-003', 'hub_west',  'Mbarara',     'En Route', 68, 62, -0.3127, 31.7138],
+    ['bus_5', 'BSG-011', 'hub_west',  'Kabale',      'Active',    0, 75, -0.3127, 31.7138],
+    ['bus_6', 'BSG-022', 'hub_west',  'Fort Portal', 'Active',    0, 93, -0.3127, 31.7138],
+    ['bus_7', 'KWP-007', 'hub_north', 'Gulu',        'En Route', 78, 81, 0.4502,  33.1998],
+    ['bus_8', 'KWP-015', 'hub_north', 'Arua',        'Active',    0, 55, 0.4502,  33.1998],
+    ['bus_9', 'KWP-031', 'hub_north', 'Hoima',       'Active',    0, 70, 0.4502,  33.1998],
   ];
   await withEntityDoc('buses', async (doc) => {
+    // Only add buses that don't exist yet; update destination/status for existing ones
     for (const b of busSeeds) {
-      if (doc.records.some((x) => x.id === b[0])) continue;
-      doc.records.push({
-        id: b[0],
-        tag: b[1],
-        hubId: b[2],
-        destination: b[3],
-        status: b[4],
-        speed: b[5],
-        battery: b[6],
-        gpsLat: b[7],
-        gpsLng: b[8],
-        lastSeen: nowIso(),
-        seatCapacity: 45,
-        approved: true,
-        createdAt: nowIso(),
-        updatedAt: nowIso(),
-      });
+      const existing = doc.records.findIndex((x) => x.id === b[0]);
+      const record = {
+        id: b[0], tag: b[1], hubId: b[2], destination: b[3], status: b[4],
+        speed: b[5], battery: b[6], gpsLat: b[7], gpsLng: b[8],
+        lastSeen: nowIso(), seatCapacity: 45, approved: true,
+        createdAt: nowIso(), updatedAt: nowIso(),
+      };
+      if (existing >= 0) {
+        // Update destination and hub to match schedule, preserve GPS/battery from simulation
+        doc.records[existing] = { ...doc.records[existing], destination: b[3], hubId: b[2], tag: b[1], approved: true, deletedAt: null, deletedBy: null };
+      } else {
+        doc.records.push(record);
+      }
     }
     return { __write: true, value: true };
   });
@@ -286,28 +279,53 @@ async function initDb() {
     return { __write: true, value: true };
   });
 
+  // ── Pricing routes (match bus fares exactly) ─────────────────────────────────
   const pricingSeeds = [
-    ['r1', 'NMV-001', 'Namanve', 'NMV', 'Entebbe', '45 km', 15000, 15000, 3000, false, '#facc15'],
-    ['r2', 'NMV-014', 'Namanve', 'NMV', 'Jinja', '80 km', 25000, 22000, 5000, true, '#facc15'],
-    ['r3', 'NMV-028', 'Namanve', 'NMV', 'Mbale', '230 km', 45000, 40000, 10000, false, '#facc15'],
-    ['r4', 'BSG-003', 'Busega', 'BSG', 'Masaka', '135 km', 35000, 30000, 7000, false, '#38bdf8'],
-    ['r5', 'BSG-011', 'Busega', 'BSG', 'Mbarara', '270 km', 45000, 42000, 8000, true, '#38bdf8'],
-    ['r6', 'BSG-022', 'Busega', 'BSG', 'Fort Portal', '320 km', 55000, 50000, 12000, false, '#38bdf8'],
-    ['r7', 'KWP-007', 'Kawempe', 'KWP', 'Gulu', '340 km', 55000, 50000, 10000, true, '#fb923c'],
-    ['r8', 'KWP-015', 'Kawempe', 'KWP', 'Arua', '490 km', 75000, 70000, 15000, false, '#fb923c'],
-    ['r9', 'KWP-031', 'Kawempe', 'KWP', 'Hoima', '220 km', 40000, 36000, 8000, false, '#fb923c'],
+    ['r1', 'NMV-001', 'Namanve', 'NMV', 'Jinja',       '80 km',  20000, 20000, 4000,  false, '#facc15'],
+    ['r2', 'NMV-014', 'Namanve', 'NMV', 'Mbale',       '230 km', 35000, 35000, 7000,  false, '#facc15'],
+    ['r3', 'NMV-028', 'Namanve', 'NMV', 'Entebbe',     '45 km',  15000, 15000, 3000,  false, '#facc15'],
+    ['r4', 'BSG-003', 'Busega',  'BSG', 'Mbarara',     '270 km', 40000, 40000, 8000,  false, '#38bdf8'],
+    ['r5', 'BSG-011', 'Busega',  'BSG', 'Kabale',      '415 km', 50000, 50000, 10000, false, '#38bdf8'],
+    ['r6', 'BSG-022', 'Busega',  'BSG', 'Fort Portal', '320 km', 55000, 55000, 11000, false, '#38bdf8'],
+    ['r7', 'KWP-007', 'Kawempe', 'KWP', 'Gulu',        '340 km', 60000, 60000, 12000, false, '#fb923c'],
+    ['r8', 'KWP-015', 'Kawempe', 'KWP', 'Arua',        '490 km', 75000, 75000, 15000, false, '#fb923c'],
+    ['r9', 'KWP-031', 'Kawempe', 'KWP', 'Hoima',       '220 km', 40000, 40000, 8000,  false, '#fb923c'],
   ];
   await withEntityDoc('pricing_routes', async (doc) => {
-    for (const p of pricingSeeds) {
-      if (doc.records.some((x) => x.id === p[0])) continue;
-      doc.records.push({
-        id: p[0], tag: p[1], hub: p[2], hubCode: p[3], destination: p[4], distance: p[5],
-        currentPrice: p[6], basePrice: p[7], peakSurcharge: p[8], isPeak: !!p[9], color: p[10],
-      });
-    }
+    // Replace all to ensure consistency
+    doc.records = pricingSeeds.map(p => ({
+      id: p[0], tag: p[1], hub: p[2], hubCode: p[3], destination: p[4], distance: p[5],
+      currentPrice: p[6], basePrice: p[7], peakSurcharge: p[8], isPeak: !!p[9], color: p[10],
+    }));
     return { __write: true, value: true };
   });
 
+  // ── Bus fares (match schedule prices exactly) ────────────────────────────────
+  const busFareSeeds = [
+    ['fare_100001', 'bus_1', 20000],
+    ['fare_100002', 'bus_2', 35000],
+    ['fare_100003', 'bus_3', 15000],
+    ['fare_100004', 'bus_4', 40000],
+    ['fare_100005', 'bus_5', 50000],
+    ['fare_100006', 'bus_6', 55000],
+    ['fare_100007', 'bus_7', 60000],
+    ['fare_100008', 'bus_8', 75000],
+    ['fare_100009', 'bus_9', 40000],
+  ];
+  await withEntityDoc('bus_fares', async (doc) => {
+    // Replace all to ensure consistency
+    doc.records = busFareSeeds.map(f => ({
+      id: f[0], busId: f[1], fareAmount: f[2], createdAt: nowIso(), updatedAt: nowIso(),
+    }));
+    return { __write: true, value: true };
+  });
+
+  // ── Departures (each schedule → correct bus) ─────────────────────────────────
+  const scheduleToBus = {
+    sch_01: 'bus_1', sch_02: 'bus_2', sch_03: 'bus_3',
+    sch_04: 'bus_4', sch_05: 'bus_5', sch_06: 'bus_6',
+    sch_07: 'bus_7', sch_08: 'bus_8', sch_09: 'bus_9',
+  };
   const dateStr = (d) => d.toISOString().slice(0, 10);
   const today = new Date();
   const travelDates = [0, 1, 2].map((i) => {
@@ -315,14 +333,6 @@ async function initDb() {
     dd.setDate(dd.getDate() + i);
     return dateStr(dd);
   });
-  const scheduleToBus = {
-    sch_01: 'bus_5',
-    sch_02: 'bus_6',
-    sch_03: 'bus_2',
-    sch_04: 'bus_3',
-    sch_05: 'bus_7',
-    sch_06: 'bus_8',
-  };
   await withEntityDoc('departures', async (doc) => {
     for (const tDate of travelDates) {
       for (const [scheduleId, busId] of Object.entries(scheduleToBus)) {
