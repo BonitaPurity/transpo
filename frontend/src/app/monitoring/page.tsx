@@ -1,13 +1,12 @@
 'use client';
 
-import React, { useMemo, useState, useEffect, useRef } from 'react';
+import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { Activity, Wifi, Zap, Radio, RefreshCw, MapPin } from 'lucide-react';
 
 import { motion, AnimatePresence } from 'framer-motion';
 import { apiService } from '@/services/api';
 import { useSocket } from '@/context/SocketContext';
 import { useAuth } from '@/context/AuthContext';
-import { useRouter } from 'next/navigation';
 import { 
   LineChart, Line, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, AreaChart, Area 
 } from 'recharts';
@@ -138,16 +137,13 @@ export default function Monitoring() {
   const [selected, setSelected] = useState<Bus | null>(null);
   const [loading, setLoading] = useState(true);
   const [alerts, setAlerts] = useState<Alert[]>([]);
-  const [isPresentationMode, setIsPresentationMode] = useState(false);
-  const [scenarioLoading, setScenarioLoading] = useState<string | null>(null);
   const [telemetryData, setTelemetryData] = useState<TelemetryPoint[]>([]);
   const [routePath, setRoutePath] = useState<Array<[number, number]>>([]);
   const [etaMinutes, setEtaMinutes] = useState<number | null>(null);
   const [resolvedDestinationCoord, setResolvedDestinationCoord] = useState<{ lat: number; lng: number } | null>(null);
   const geocodeCacheRef = useRef<Record<string, { lat: number; lng: number } | null>>({});
 
-  const { user, isAdmin, isLoading } = useAuth();
-  const router = useRouter();
+  const { isAdmin, isLoading } = useAuth();
 
   const socket = useSocket();
   const selectedBusId = selected?.id;
@@ -299,8 +295,17 @@ export default function Monitoring() {
     return () => {
       socket.off('fleet_update');
       socket.off('telemetry_update');
+      socket.off('alerts_update');
     };
   }, [socket, selectedBusId]);
+
+  useEffect(() => {
+    if (!socket) return;
+    socket.on('alerts_update', (data: Alert[]) => {
+      if (Array.isArray(data)) setAlerts(data.slice(0, 10));
+    });
+    return () => { socket.off('alerts_update'); };
+  }, [socket]);
 
   useEffect(() => {
     if (!selected?.id) return;
@@ -377,9 +382,9 @@ export default function Monitoring() {
   );
 
 
-  const fetchFleet = async () => {
+  const fetchFleet = useCallback(async () => {
     try {
-      const res = await apiService.getFleet();
+      const res = isAdmin ? await apiService.getFleet() : await apiService.getFleetLive();
       if (res.success) {
         const fleetData = res.data as Bus[];
         const mappedBuses = fleetData.map((b: Bus) => {
@@ -394,9 +399,9 @@ export default function Monitoring() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [isAdmin]);
 
-  const fetchAlerts = async () => {
+  const fetchAlerts = useCallback(async () => {
     try {
       const res = await apiService.getAlerts();
       if (res.success) {
@@ -405,36 +410,18 @@ export default function Monitoring() {
     } catch {
       console.error('Alert fetch failed');
     }
-  };
-
-  const triggerScenario = async (scenario: string) => {
-    setScenarioLoading(scenario);
-    try {
-      const res = await apiService.triggerScenario(scenario);
-      if (res.success) {
-        await Promise.all([fetchFleet(), fetchAlerts()]);
-      }
-    } catch (err) {
-      console.error('Scenario trigger failed', err);
-    } finally {
-      setTimeout(() => setScenarioLoading(null), 1500);
-    }
-  };
+  }, []);
 
   useEffect(() => {
     if (isLoading) return;
-    if (!user || !isAdmin) {
-      setLoading(false);
-      router.replace('/login');
-      return;
-    }
     fetchFleet();
+    if (!isAdmin) return;
     fetchAlerts();
     const interval = setInterval(() => {
       fetchAlerts();
     }, 10000);
     return () => clearInterval(interval);
-  }, [isLoading, user, isAdmin, router]);
+  }, [fetchAlerts, fetchFleet, isAdmin, isLoading]);
 
   const statusColor = (s: string) => {
     if (s === 'Active' || s === 'En Route') return 'bg-green-500';
@@ -446,44 +433,6 @@ export default function Monitoring() {
 
   return (
     <div className="max-w-[1700px] mx-auto space-y-10 relative">
-      {/* Presentation Remote Toggle */}
-      <button 
-        onClick={() => setIsPresentationMode(!isPresentationMode)}
-        className="fixed bottom-10 right-10 z-[100] w-20 h-20 bg-yellow-400 border-4 border-black rounded-full shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] flex items-center justify-center hover:scale-110 active:scale-95 transition-all group"
-      >
-         <Settings className={`w-8 h-8 text-black ${isPresentationMode ? 'rotate-90' : 'group-hover:rotate-45'} transition-transform`} />
-      </button>
-
-      {/* Presentation Controls Overlay */}
-      {isPresentationMode && (
-        <motion.div 
-          initial={{ opacity: 0, x: 100 }}
-          animate={{ opacity: 1, x: 0 }}
-          className="fixed top-32 right-32 z-50 w-80 bg-black border-4 border-yellow-400 rounded-[40px] p-8 shadow-2xl space-y-6"
-        >
-           <h3 className="font-black text-yellow-400 uppercase italic tracking-tighter text-xl">Presentation Controls</h3>
-           <div className="space-y-3">
-              {[
-                { id: 'battery_low',     label: 'Simulate Failure', icon: Zap },
-                { id: 'traffic_delay',    label: 'Traffic Impact',   icon: Radio },
-                { id: 'hub_congestion',   label: 'Hub Overload',     icon: MapPin },
-                { id: 'weather_emergency', label: 'Weather Restriction', icon: RefreshCw },
-                { id: 'reset',           label: 'Reset Systems',    icon: Wifi, color: 'text-green-400' },
-              ].map(s => (
-                <button 
-                  key={s.id}
-                  onClick={() => triggerScenario(s.id)}
-                  disabled={scenarioLoading !== null}
-                  className={`w-full p-4 rounded-2xl flex items-center gap-4 transition-all ${scenarioLoading === s.id ? 'bg-zinc-800 animate-pulse' : 'bg-zinc-900 hover:bg-zinc-800'}`}
-                >
-                   <s.icon className={`w-5 h-5 ${s.color || 'text-yellow-400'}`} />
-                   <span className="text-[10px] font-black uppercase tracking-widest text-white">{s.label}</span>
-                </button>
-              ))}
-           </div>
-        </motion.div>
-      )}
-
       {/* Header */}
       <header className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
         <div className="space-y-1">
@@ -764,38 +713,40 @@ export default function Monitoring() {
                     </p>
 
                     {/* Remote Operations */}
-                    <div className="pt-2 border-t border-white/5 space-y-4">
-                       <h4 className="text-[9px] font-black uppercase text-yellow-500 tracking-widest">Remote Operations</h4>
-                       <div className="grid grid-cols-2 gap-3">
-                          <button 
-                            onClick={async () => {
-                              const res = await apiService.maintenanceAction(selected.id, 'charge');
-                              if (res.success) fetchFleet();
-                            }}
-                            className="bg-zinc-900 hover:bg-zinc-800 text-[9px] font-black uppercase py-3 rounded-xl text-white border border-white/5 transition-all flex items-center justify-center gap-2"
-                          >
-                             <Zap className="w-3 h-3 text-yellow-400" /> Init Charge
-                          </button>
-                          <button 
+                    {isAdmin && (
+                      <div className="pt-2 border-t border-white/5 space-y-4">
+                        <h4 className="text-[9px] font-black uppercase text-yellow-500 tracking-widest">Remote Operations</h4>
+                        <div className="grid grid-cols-2 gap-3">
+                           <button 
                              onClick={async () => {
-                                const res = await apiService.maintenanceAction(selected.id, 'repair');
-                                if (res.success) fetchFleet();
-                            }}
-                            className="bg-zinc-900 hover:bg-zinc-800 text-[9px] font-black uppercase py-3 rounded-xl text-white border border-white/5 transition-all flex items-center justify-center gap-2"
-                          >
-                             <RefreshCw className="w-3 h-3 text-blue-400" /> Total Reset
-                          </button>
-                          <button 
-                            onClick={async () => {
-                                const res = await apiService.maintenanceAction(selected.id, 'emergency_stop');
-                                if (res.success) fetchFleet();
-                            }}
-                            className="bg-red-500/10 hover:bg-red-500/20 text-[9px] font-black uppercase py-3 rounded-xl text-red-500 border border-red-500/20 col-span-2 transition-all"
-                          >
-                             Emergency Override
-                          </button>
-                       </div>
-                    </div>
+                               const res = await apiService.maintenanceAction(selected.id, 'charge');
+                               if (res.success) fetchFleet();
+                             }}
+                             className="bg-zinc-900 hover:bg-zinc-800 text-[9px] font-black uppercase py-3 rounded-xl text-white border border-white/5 transition-all flex items-center justify-center gap-2"
+                           >
+                              <Zap className="w-3 h-3 text-yellow-400" /> Init Charge
+                           </button>
+                           <button 
+                              onClick={async () => {
+                                 const res = await apiService.maintenanceAction(selected.id, 'repair');
+                                 if (res.success) fetchFleet();
+                             }}
+                             className="bg-zinc-900 hover:bg-zinc-800 text-[9px] font-black uppercase py-3 rounded-xl text-white border border-white/5 transition-all flex items-center justify-center gap-2"
+                           >
+                              <RefreshCw className="w-3 h-3 text-blue-400" /> Total Reset
+                           </button>
+                           <button 
+                             onClick={async () => {
+                                 const res = await apiService.maintenanceAction(selected.id, 'emergency_stop');
+                                 if (res.success) fetchFleet();
+                             }}
+                             className="bg-red-500/10 hover:bg-red-500/20 text-[9px] font-black uppercase py-3 rounded-xl text-red-500 border border-red-500/20 col-span-2 transition-all"
+                           >
+                              Emergency Override
+                           </button>
+                        </div>
+                      </div>
+                    )}
                  </div>
                </motion.div>
              ) : (
@@ -825,14 +776,21 @@ export default function Monitoring() {
                          className={`p-5 rounded-3xl border-4 ${
                            a.severity === 'warning' ? 'bg-amber-500/10 border-amber-500/20 text-amber-600' :
                            a.severity === 'critical' ? 'bg-red-500/10 border-red-500/20 text-red-600' :
+                           a.severity === 'ok' ? 'bg-green-500/10 border-green-500/20 text-green-600' :
                            'bg-black border-black text-white'
                          }`}
                       >
-                         <div className="flex items-center gap-3 mb-2">
+                         <div className="flex items-center gap-3 mb-2 flex-wrap">
                             {a.severity === 'critical' ? <AlertCircle className="w-4 h-4" /> : <Wifi className="w-4 h-4" />}
                             <span className="text-[9px] font-black uppercase tracking-widest opacity-60">Event LOG_{String(a.id).slice(0,4)}</span>
+                            {/Simulated|Scenario|Advisory|Emergency|Restriction|Congestion|Offline|Reset/i.test(a.message) && (
+                              <span className="text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-yellow-400 text-black border border-black">
+                                Scenario
+                              </span>
+                            )}
                          </div>
                          <p className="font-black text-xs leading-relaxed uppercase">{a.message}</p>
+                         <p className="text-[9px] font-bold opacity-40 mt-1">{new Date(a.createdAt).toLocaleTimeString()}</p>
                       </motion.div>
                     ))}
                  </div>

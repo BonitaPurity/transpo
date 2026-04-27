@@ -3,7 +3,7 @@
 import { motion } from 'framer-motion';
 import {
   BarChart3, TrendingUp, TrendingDown, AlertTriangle,
-  CheckCircle2, Lightbulb, Clock, Users, Zap, Target, Loader2, Download
+  CheckCircle2, Lightbulb, Clock, Users, Zap, Target, Loader2, Download, Truck
 } from 'lucide-react';
 
 
@@ -64,6 +64,8 @@ interface Challenge {
 interface MetricsData {
   todayBookings: number;
   todayRevenue: number;
+  todayDeliveryRevenue: number;
+  totalDeliveryRevenue: number;
   onTimeRate: string;
   challenges: Challenge[];
 }
@@ -108,10 +110,10 @@ export default function AdminMetrics() {
     if (!user?.email) return;
     setExporting(format);
     try {
-      await apiService.downloadManifest(format);
-      notifySuccess(format === 'pdf' ? 'Audit Manifest PDF downloaded.' : 'Audit Manifest CSV downloaded.');
+      await apiService.downloadMetrics(format);
+      notifySuccess(format === 'pdf' ? 'Ops Intelligence PDF downloaded.' : 'Ops Intelligence CSV downloaded.');
     } catch {
-      notifyError(format === 'pdf' ? 'Failed to download audit manifest PDF.' : 'Failed to download audit manifest CSV.');
+      notifyError(format === 'pdf' ? 'Failed to download Ops Intelligence PDF.' : 'Failed to download Ops Intelligence CSV.');
     } finally {
       setExporting('');
     }
@@ -156,12 +158,13 @@ export default function AdminMetrics() {
 
 
       {/* Quick summary KPIs */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-5">
         {[
-          { label: 'Challenges Today',   value: challenges.filter(c => c.status !== 'resolved').length, icon: AlertTriangle, color: '#f87171', sub: `${challenges.filter(c=>c.status==='resolved').length} resolved` },
-          { label: 'On-Time Rate',        value: liveStats?.onTimeRate || '91%',   icon: Clock,       color: '#4ade80', sub: 'Calculated live' },
-          { label: "Today's Bookings",    value: liveStats?.todayBookings || '0',   icon: Users,       color: '#38bdf8', sub: 'Real DB entries' },
-          { label: "Today's Revenue",     value: `UGX ${(liveStats?.todayRevenue || 0).toLocaleString()}`, icon: Target,     color: '#facc15', sub: 'Verified transactions' },
+          { label: 'Challenges Today',      value: challenges.filter(c => c.status !== 'resolved').length, icon: AlertTriangle, color: '#f87171', sub: `${challenges.filter(c=>c.status==='resolved').length} resolved` },
+          { label: 'On-Time Rate',           value: liveStats?.onTimeRate || '91%',   icon: Clock,    color: '#4ade80', sub: 'Calculated live' },
+          { label: "Today's Bookings",       value: liveStats?.todayBookings || '0',  icon: Users,    color: '#38bdf8', sub: 'Real DB entries' },
+          { label: "Today's Revenue",        value: `UGX ${(liveStats?.todayRevenue || 0).toLocaleString()}`, icon: Target, color: '#facc15', sub: 'Ticket payments today' },
+          { label: "Delivery Fees",          value: `UGX ${(liveStats?.totalDeliveryRevenue || 0).toLocaleString()}`, icon: Truck, color: '#a78bfa', sub: `UGX ${(liveStats?.todayDeliveryRevenue || 0).toLocaleString()} today` },
         ].map((s, i) => (
 
           <motion.div key={s.label} initial={{ opacity:0, y:15 }} animate={{ opacity:1, y:0 }} transition={{ delay: i * 0.07 }}
@@ -269,55 +272,61 @@ export default function AdminMetrics() {
       </div>
 
       {/* Route Performance Table */}
-      <div className="bg-zinc-800/60 border border-zinc-700 rounded-3xl overflow-hidden">
-        <div className="px-8 py-6 border-b border-zinc-700 flex items-center gap-3">
+      <div className="bg-zinc-800/60 border border-zinc-700 rounded-3xl">
+        <div className="px-4 sm:px-6 lg:px-8 py-6 border-b border-zinc-700 flex items-center gap-3">
           <TrendingUp className="w-6 h-6 text-yellow-400" />
           <h3 className="text-2xl font-black text-yellow-400 uppercase italic tracking-tighter">Route Performance</h3>
         </div>
 
-        <div className="grid grid-cols-6 gap-4 px-8 py-3 text-[9px] font-black uppercase tracking-widest text-white/20">
-          <div className="col-span-2">Route</div>
-          <div>Hub</div>
-          <div>Utilization</div>
-          <div>Avg Delay</div>
-          <div>Fare / Trend</div>
-        </div>
+        <div className="overflow-x-auto">
+          <div className="min-w-[900px]">
+            <div className="grid grid-cols-6 gap-4 px-4 sm:px-6 lg:px-8 py-3 text-xs font-black uppercase tracking-widest text-white/20">
+              <div className="col-span-2">Route</div>
+              <div>Hub</div>
+              <div>Utilization</div>
+              <div>Avg Delay</div>
+              <div>Fare / Trend</div>
+            </div>
 
-        <div className="divide-y divide-zinc-700/30">
-          {ROUTE_PERF.map((r, i) => (
-            <motion.div
-              key={r.route}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: i * 0.05 }}
-              className="grid grid-cols-6 gap-4 px-8 py-5 items-center hover:bg-zinc-700/20 transition-all"
-            >
-              <div className="col-span-2 font-black text-white text-sm">{r.route}</div>
-              <div>
-                <span className="text-[10px] font-black px-2 py-1 rounded-xl uppercase border"
-                  style={{ color: hubColor[r.hub], borderColor: `${hubColor[r.hub]}40`, background: `${hubColor[r.hub]}15` }}>
-                  {r.hub}
-                </span>
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 h-2 bg-zinc-700 rounded-full overflow-hidden">
-                    <div className="h-full rounded-full" style={{ width: `${r.utilization}%`, background: r.utilization > 85 ? '#f87171' : r.utilization > 65 ? '#fb923c' : '#4ade80' }} />
+            <div className="divide-y divide-zinc-700/30">
+              {ROUTE_PERF.map((r, i) => (
+                <motion.div
+                  key={r.route}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: i * 0.05 }}
+                  className="grid grid-cols-6 gap-4 px-4 sm:px-6 lg:px-8 py-5 items-center hover:bg-zinc-700/20 transition-all min-w-0"
+                >
+                  <div className="col-span-2 font-black text-white text-sm min-w-0 truncate">{r.route}</div>
+                  <div className="min-w-0">
+                    <span
+                      className="text-xs font-black px-2 py-1 rounded-xl uppercase border inline-flex"
+                      style={{ color: hubColor[r.hub], borderColor: `${hubColor[r.hub]}40`, background: `${hubColor[r.hub]}15` }}
+                    >
+                      {r.hub}
+                    </span>
                   </div>
-                  <span className="text-xs font-black text-white">{r.utilization}%</span>
-                </div>
-              </div>
-              <div className={`text-sm font-black ${parseInt(r.avgDelay) > 8 ? 'text-red-400' : parseInt(r.avgDelay) > 4 ? 'text-amber-400' : 'text-green-400'}`}>
-                {r.avgDelay}
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-black text-white">UGX {r.revenue.toLocaleString()}</span>
-                {r.trend === 'up' && <TrendingUp className="w-4 h-4 text-green-400" />}
-                {r.trend === 'down' && <TrendingDown className="w-4 h-4 text-red-400" />}
-                {r.trend === 'neutral' && <Zap className="w-4 h-4 text-white/20" />}
-              </div>
-            </motion.div>
-          ))}
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="flex-1 h-2 bg-zinc-700 rounded-full overflow-hidden min-w-20">
+                        <div className="h-full rounded-full" style={{ width: `${r.utilization}%`, background: r.utilization > 85 ? '#f87171' : r.utilization > 65 ? '#fb923c' : '#4ade80' }} />
+                      </div>
+                      <span className="text-xs font-black text-white shrink-0">{r.utilization}%</span>
+                    </div>
+                  </div>
+                  <div className={`text-sm font-black ${parseInt(r.avgDelay) > 8 ? 'text-red-400' : parseInt(r.avgDelay) > 4 ? 'text-amber-400' : 'text-green-400'}`}>
+                    {r.avgDelay}
+                  </div>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-sm font-black text-white truncate">UGX {r.revenue.toLocaleString()}</span>
+                    {r.trend === 'up' && <TrendingUp className="w-4 h-4 text-green-400 shrink-0" />}
+                    {r.trend === 'down' && <TrendingDown className="w-4 h-4 text-red-400 shrink-0" />}
+                    {r.trend === 'neutral' && <Zap className="w-4 h-4 text-white/20 shrink-0" />}
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </div>

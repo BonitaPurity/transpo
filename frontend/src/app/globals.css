@@ -1,6 +1,8 @@
 @import "tailwindcss";
 @import "leaflet/dist/leaflet.css";
 
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
 :root {
   --background: #ffffff;
   --foreground: #000000;
@@ -22,11 +24,44 @@ body {
   color: #000000;
   background: #ffffff;
   font-family: 'Geist', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  font-size: 16px;
+  line-height: 1.5;
   overflow-x: hidden;
   margin: 0;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  touch-action: manipulation;
+}
+
+:where(button, a, input, select, textarea) {
+  min-height: 44px;
+}
+
+:where(a, button) {
+  -webkit-tap-highlight-color: transparent;
+}
+
+@media (max-width: 360px) {
+  :root {
+    font-size: 15px;
+  }
 }
 
 [data-theme='dark'] body {
@@ -35,6 +70,66 @@ body {
 }
 
 @layer components {
+  .ui-container {
+    @apply w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+
+  .ui-page {
+    @apply w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-10 space-y-6 sm:space-y-8;
+  }
+
+  .ui-card {
+    @apply bg-white text-black border-2 border-black rounded-2xl shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] p-5 sm:p-6;
+  }
+
+  .ui-card-header {
+    @apply flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between;
+  }
+
+  .ui-h1 {
+    @apply text-3xl sm:text-4xl font-black tracking-tight;
+  }
+
+  .ui-h2 {
+    @apply text-2xl sm:text-3xl font-black tracking-tight;
+  }
+
+  .ui-body {
+    @apply text-sm sm:text-base font-medium text-black/80;
+  }
+
+  .ui-label {
+    @apply text-sm font-black text-black uppercase tracking-wide;
+  }
+
+  .ui-input {
+    @apply w-full min-h-11 rounded-xl border-2 border-black bg-white px-4 text-base font-semibold text-black placeholder:text-black/40 focus:outline-none focus-visible:ring-4 focus-visible:ring-yellow-400/60;
+  }
+
+  .ui-select {
+    @apply w-full min-h-11 rounded-xl border-2 border-black bg-white px-4 text-base font-semibold text-black focus:outline-none focus-visible:ring-4 focus-visible:ring-yellow-400/60;
+  }
+
+  .ui-btn {
+    @apply inline-flex items-center justify-center gap-2 min-h-11 px-5 rounded-xl border-2 border-black text-base font-black focus:outline-none focus-visible:ring-4 focus-visible:ring-yellow-400/60 active:translate-x-[1px] active:translate-y-[1px];
+  }
+
+  .ui-btn-primary {
+    @apply inline-flex items-center justify-center gap-2 min-h-11 px-5 rounded-xl border-2 border-black text-base font-black focus:outline-none focus-visible:ring-4 focus-visible:ring-yellow-400/60 active:translate-x-[1px] active:translate-y-[1px] bg-yellow-400 text-black hover:bg-yellow-300;
+  }
+
+  .ui-btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 min-h-11 px-5 rounded-xl border-2 border-black text-base font-black focus:outline-none focus-visible:ring-4 focus-visible:ring-yellow-400/60 active:translate-x-[1px] active:translate-y-[1px] bg-white text-black hover:bg-zinc-50;
+  }
+
+  .ui-btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 min-h-11 px-5 rounded-xl border-2 border-black text-base font-black focus:outline-none focus-visible:ring-4 focus-visible:ring-yellow-400/60 active:translate-x-[1px] active:translate-y-[1px] border-transparent bg-transparent hover:bg-black/5;
+  }
+
+  .ui-icon-btn {
+    @apply inline-flex items-center justify-center min-h-11 min-w-11 rounded-xl border-2 border-black bg-white text-black hover:bg-zinc-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-yellow-400/60 active:translate-x-[1px] active:translate-y-[1px];
+  }
+
   .card-premium {
     background-color: var(--card);
     border: 3px solid #000000;
@@ -113,7 +208,7 @@ body {
 }
 
 .label-small {
-  font-size: 0.7rem;
+  font-size: 0.875rem;
   font-weight: 900;
   text-transform: uppercase;
   color: #000000;

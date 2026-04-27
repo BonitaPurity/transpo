@@ -241,9 +241,9 @@ export default function ScenarioLab() {
                 <ShieldAlert className="w-8 h-8 text-black" />
              </div>
              <div>
-                <div className="text-xs font-black uppercase text-white underline decoration-yellow-400">Presentation Note</div>
+                <div className="text-xs font-black uppercase text-white underline decoration-yellow-400">Ops Intelligence</div>
                 <p className="text-[10px] font-bold text-white/40 leading-relaxed uppercase tracking-tighter mt-1">
-                   These events are global. Monitor the main dashboard and telemetry map on a separate screen to see real-time impact.
+                   Executed scenarios appear as active challenges in the Ops Intelligence tab. Use System Reset to clear all scenario challenges. Live tracking is unaffected.
                 </p>
              </div>
           </div>

@@ -1,4 +1,7 @@
 const RAW_API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
+const AUTH_STORAGE_KEY = 'transpo_user';
+const TOKEN_REFRESH_SKEW_MS = 30 * 1000;
+let refreshInFlightPromise = null;
 
 function getApiBaseUrl() {
   if (typeof window === 'undefined') return RAW_API_BASE_URL;
@@ -12,11 +15,83 @@ function getApiBaseUrl() {
 function getStoredAuth() {
   if (typeof window === 'undefined') return null;
   try {
-    return JSON.parse(localStorage.getItem('transpo_user') || 'null');
+    return JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY) || 'null');
   } catch (error) {
     console.error('Failed to parse stored auth token', error);
     return null;
   }
+}
+
+function setStoredAuth(auth) {
+  if (typeof window === 'undefined') return;
+  if (!auth) return;
+  localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(auth));
+}
+
+function clearStoredAuth() {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem(AUTH_STORAGE_KEY);
+}
+
+function isAuthPath(path) {
+  return typeof path === 'string' && (
+    path.startsWith('/auth/login') ||
+    path.startsWith('/auth/register') ||
+    path.startsWith('/auth/me') ||
+    path.startsWith('/auth/refresh') ||
+    path.startsWith('/auth/logout')
+  );
+}
+
+function shouldProactivelyRefresh(auth) {
+  if (!auth?.token || !auth?.refreshToken || !auth?.tokenExpiresAt) return false;
+  const exp = new Date(auth.tokenExpiresAt).getTime();
+  if (!Number.isFinite(exp)) return false;
+  return exp - Date.now() <= TOKEN_REFRESH_SKEW_MS;
+}
+
+async function refreshSessionToken() {
+  if (typeof window === 'undefined') return false;
+  if (refreshInFlightPromise) return refreshInFlightPromise;
+
+  refreshInFlightPromise = (async () => {
+    const auth = getStoredAuth();
+    const refreshToken = String(auth?.refreshToken || '').trim();
+    if (!refreshToken) return false;
+
+    try {
+      const url = `${getApiBaseUrl()}/auth/refresh`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'accept': 'application/json',
+        },
+        body: JSON.stringify({ refreshToken }),
+      });
+      if (!response.ok) return false;
+      const body = await response.json();
+      if (!body?.success || !body?.data?.token) return false;
+
+      const merged = {
+        ...(auth || {}),
+        ...(body.data.user || {}),
+        token: body.data.token,
+        refreshToken: body.data.refreshToken || refreshToken,
+        tokenExpiresAt: body.data.tokenExpiresAt || auth?.tokenExpiresAt,
+        refreshTokenExpiresAt: body.data.refreshTokenExpiresAt || auth?.refreshTokenExpiresAt,
+      };
+      setStoredAuth(merged);
+      return true;
+    } catch (error) {
+      console.error('TRANSPO_API: Token refresh failed', error);
+      return false;
+    } finally {
+      refreshInFlightPromise = null;
+    }
+  })();
+
+  return refreshInFlightPromise;
 }
 
 function getAuthHeaders() {
@@ -75,13 +150,23 @@ async function trySaveWithPicker(blob, filename, mime) {
 }
 
 async function downloadBlobFromPath(path, filename) {
+  const currentAuth = getStoredAuth();
+  if (!isAuthPath(path) && shouldProactivelyRefresh(currentAuth)) {
+    await refreshSessionToken();
+  }
   const url = `${getApiBaseUrl()}${path}`;
-  const res = await fetch(url, {
+  let res = await fetch(url, {
     headers: getAuthHeaders(),
   });
+  if (res.status === 401 && !isAuthPath(path)) {
+    const refreshed = await refreshSessionToken();
+    if (refreshed) {
+      res = await fetch(url, { headers: getAuthHeaders() });
+    }
+  }
   if (!res.ok) {
     if (res.status === 401 && typeof window !== 'undefined') {
-      localStorage.removeItem('transpo_user');
+      clearStoredAuth();
     }
     let message = 'Download failed';
     try {
@@ -110,9 +195,14 @@ async function downloadBlobFromPath(path, filename) {
  * @param {string} path 
  * @param {RequestInit} options 
  */
-async function request(path, options = {}, attempt = 0) {
+async function request(path, options = {}, attempt = 0, canRefresh = true) {
   const url = `${getApiBaseUrl()}${path}`;
   try {
+    const currentAuth = getStoredAuth();
+    if (canRefresh && !isAuthPath(path) && shouldProactivelyRefresh(currentAuth)) {
+      await refreshSessionToken();
+    }
+
     const { headers: customHeaders, ...restOptions } = options;
     const finalHeaders = { ...getAuthHeaders(), ...(customHeaders || {}) };
     
@@ -123,10 +213,20 @@ async function request(path, options = {}, attempt = 0) {
 
     if (!res.ok) {
       if (res.status === 401) {
-        console.error(`TRANSPO_API: 401 Unauthorized for ${path}. Token may be missing or expired.`);
+        if (canRefresh && !isAuthPath(path)) {
+          const refreshed = await refreshSessionToken();
+          if (refreshed) {
+            return request(path, options, attempt, false);
+          }
+        }
+        if (path.startsWith('/auth/me')) {
+          return { success: false, status: 401, message: 'Not authenticated' };
+        }
+        if (!isAuthPath(path)) {
+          console.error(`TRANSPO_API: 401 Unauthorized for ${path}. Token missing, expired, or refresh failed.`);
+        }
         if (typeof window !== 'undefined') {
-          localStorage.removeItem('transpo_user');
-          // Dispatch a custom event so the UI can respond to the session loss
+          clearStoredAuth();
           window.dispatchEvent(new CustomEvent('transpo_unauthorized'));
         }
       }
@@ -162,11 +262,15 @@ async function request(path, options = {}, attempt = 0) {
     console.error(`Non-JSON response from ${url} (${res.status}). Body starts with: ${bodyText.substring(0, 120)}...`);
     return { success: false, status: res.status, message: `API unavailable or misconfigured for ${url}` };
   } catch (error) {
-    console.error(`Request Error for ${url}:`, error);
+    const name = error && typeof error === 'object' ? error.name : '';
+    if (name === 'AbortError') {
+      return { success: false, status: 0, message: 'Request aborted' };
+    }
     if (attempt === 0) {
       await new Promise((r) => setTimeout(r, 400));
       return request(path, options, attempt + 1);
     }
+    console.error(`Request Error for ${url}:`, error);
     return { success: false, status: 0, message: error?.message || 'Request failed' };
   }
 }
@@ -203,6 +307,17 @@ export const apiService = {
     return request('/auth/change-password', {
       method: 'POST',
       body: JSON.stringify({ currentPassword, newPassword }),
+    });
+  },
+
+  async getMe() {
+    return request('/auth/me');
+  },
+
+  async logout(refreshToken) {
+    return request('/auth/logout', {
+      method: 'POST',
+      body: JSON.stringify({ refreshToken }),
     });
   },
 
@@ -258,6 +373,11 @@ export const apiService = {
   async getFleet(hubId) {
     const query = hubId ? `?hubId=${encodeURIComponent(hubId)}` : '';
     return request(`/fleet${query}`);
+  },
+
+  async getFleetLive(hubId) {
+    const query = hubId ? `?hubId=${encodeURIComponent(hubId)}` : '';
+    return request(`/fleet/live${query}`);
   },
 
   async getStats() {
@@ -397,6 +517,13 @@ export const apiService = {
     });
   },
 
+  async deleteBus(busId, reason = '') {
+    return request(`/fleet/${encodeURIComponent(busId)}`, {
+      method: 'DELETE',
+      body: JSON.stringify({ reason }),
+    });
+  },
+
   async getPricing() {
     return request('/pricing');
   },
@@ -416,7 +543,6 @@ export const apiService = {
   async updateBusFare(busId, fareAmount) {
     return request(`/admin/bus-fares/${encodeURIComponent(busId)}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ fareAmount }),
     });
   },
@@ -441,6 +567,12 @@ export const apiService = {
     const dateKey = new Date().toISOString().split('T')[0];
     const ext = String(format).toLowerCase() === 'pdf' ? 'pdf' : 'csv';
     return downloadBlobFromPath(`/admin/manifest/export?format=${encodeURIComponent(ext)}`, `TRANSPO_AUDIT_${dateKey}.${ext}`);
+  },
+
+  async downloadMetrics(format = 'csv') {
+    const dateKey = new Date().toISOString().split('T')[0];
+    const ext = String(format).toLowerCase() === 'pdf' ? 'pdf' : 'csv';
+    return downloadBlobFromPath(`/metrics/export?format=${encodeURIComponent(ext)}`, `TRANSPO_OPS_INTELLIGENCE_${dateKey}.${ext}`);
   },
 
   async downloadAdminBookingsExport(format = 'csv', paymentStatus = 'Completed') {

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MapPin, Zap, Radio, Settings, Plus, X } from 'lucide-react';
+import { MapPin, Zap, Settings, Plus, X, Trash2, Pencil } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { apiService } from '@/services/api';
 
@@ -34,6 +34,9 @@ export default function AdminFleet() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [knownDestinations, setKnownDestinations] = useState<string[]>([]);
+  const [busyBusId, setBusyBusId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deleteReason, setDeleteReason] = useState('');
 
   const [creating, setCreating] = useState(false);
   const [newBus, setNewBus] = useState<Omit<Bus, 'id'>>({
@@ -50,7 +53,18 @@ export default function AdminFleet() {
   });
 
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editingValues, setEditingValues] = useState<Partial<Bus>>({ gpsLat: 0, gpsLng: 0, speed: 0, battery: 0, status: '' });
+  const [editingValues, setEditingValues] = useState<Partial<Bus>>({
+    tag: '',
+    hubId: '',
+    destination: '',
+    gpsLat: 0,
+    gpsLng: 0,
+    speed: 0,
+    battery: 0,
+    status: '',
+    seatCapacity: 45,
+    approved: true,
+  });
 
   const destinationListId = useMemo(() => `destinations_${selectedHub || 'all'}`, [selectedHub]);
 
@@ -63,10 +77,6 @@ export default function AdminFleet() {
       if (res?.success) {
         setFleet(res.data as Bus[]);
       }
-
-
-
-
     } catch {
       setError('Unable to load fleet');
     } finally {
@@ -74,23 +84,19 @@ export default function AdminFleet() {
     }
   }, [selectedHub]);
 
+  // loadHubs has no deps — it only sets selectedHub on first load via functional updater
   const loadHubs = useCallback(async () => {
     try {
       const res = await apiService.getHubs();
       if (res?.success) {
         setHubs(res.data as Hub[]);
-
-
-
-
-        if (!selectedHub && res.data?.length) {
-          setSelectedHub(res.data[0].id);
-        }
+        // Only auto-select the first hub if none is selected yet (avoids re-render loop)
+        setSelectedHub((prev) => prev || (res.data?.[0]?.id ?? ''));
       }
     } catch {
       setError('Unable to load hubs');
     }
-  }, [selectedHub]);
+  }, []); // intentionally empty — no selectedHub dep to prevent infinite loop
 
   const loadDestinations = useCallback(async () => {
     try {
@@ -107,17 +113,19 @@ export default function AdminFleet() {
     }
   }, [selectedHub]);
 
+  // Load hubs once on mount
   useEffect(() => {
     loadHubs();
   }, [loadHubs]);
 
+  // Reload fleet + destinations whenever selectedHub changes
   useEffect(() => {
+    if (!selectedHub) return;
     loadFleet();
     loadDestinations();
-    if (!newBus.hubId && selectedHub) {
-      setNewBus((prev) => ({ ...prev, hubId: selectedHub }));
-    }
-  }, [loadFleet, loadDestinations, selectedHub, newBus.hubId]);
+    // Sync newBus.hubId to the selected hub without newBus.hubId as a dep (avoids loop)
+    setNewBus((prev) => (prev.hubId === selectedHub ? prev : { ...prev, hubId: selectedHub }));
+  }, [selectedHub, loadFleet, loadDestinations]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -174,13 +182,53 @@ export default function AdminFleet() {
       return;
     }
 
-    const res = await apiService.updateBus(busId, editingValues);
+    const updates: Partial<Bus> = {
+      tag: editingValues.tag,
+      hubId: editingValues.hubId,
+      destination: editingValues.destination,
+      gpsLat: editingValues.gpsLat,
+      gpsLng: editingValues.gpsLng,
+      speed: editingValues.speed,
+      battery: editingValues.battery,
+      status: editingValues.status,
+      seatCapacity: editingValues.seatCapacity,
+      approved: editingValues.approved,
+    };
+
+    if (updates.seatCapacity !== undefined && (!Number.isFinite(Number(updates.seatCapacity)) || Number(updates.seatCapacity) <= 0)) {
+      setError('Seat capacity must be a positive number');
+      return;
+    }
+
+    setBusyBusId(busId);
+    const res = await apiService.updateBus(busId, updates);
     if (!res?.success) {
       setError(res?.message || 'Unable to update bus');
+      setBusyBusId(null);
       return;
     }
 
     setEditingId(null);
+    setBusyBusId(null);
+    await loadFleet();
+  };
+
+  const handleDeleteBus = async (busId: string) => {
+    if (!user?.email) {
+      setError('Admin session is required');
+      return;
+    }
+    setError('');
+    setBusyBusId(busId);
+    const res = await apiService.deleteBus(busId, deleteReason);
+    if (!res?.success) {
+      setError(res?.message || 'Unable to delete bus');
+      setBusyBusId(null);
+      return;
+    }
+    setConfirmDeleteId(null);
+    setDeleteReason('');
+    setBusyBusId(null);
     await loadFleet();
   };
 
@@ -374,16 +422,28 @@ export default function AdminFleet() {
                     onClick={() => {
                       setEditingId(bus.id);
                       setEditingValues({
+                        tag: bus.tag,
+                        hubId: bus.hubId,
+                        destination: bus.destination,
                         gpsLat: bus.gpsLat,
                         gpsLng: bus.gpsLng,
                         speed: bus.speed,
                         battery: bus.battery,
-                        status: bus.status
+                        status: bus.status,
+                        seatCapacity: bus.seatCapacity ?? 45,
+                        approved: bus.approved !== false,
                       });
                     }}
                     className="p-2 hover:bg-zinc-700 rounded-xl transition-colors text-white/40 hover:text-white"
                   >
-                    <Settings className="w-4 h-4" />
+                    <Pencil className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => setConfirmDeleteId(bus.id)}
+                    className="p-2 hover:bg-red-500/10 rounded-xl transition-colors text-white/30 hover:text-red-300"
+                    disabled={busyBusId === bus.id}
+                  >
+                    <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
               </div>
@@ -425,6 +485,38 @@ export default function AdminFleet() {
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-[10px] font-black uppercase text-yellow-400 tracking-[0.2em]">Update Unit {bus.tag}</span>
                       <button onClick={() => setEditingId(null)}><X className="w-5 h-5" /></button>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-black uppercase text-white/30">Bus Tag</label>
+                        <input
+                          value={String(editingValues.tag || '')}
+                          onChange={(e) => setEditingValues((v) => ({ ...v, tag: e.target.value }))}
+                          className="w-full bg-black/60 border border-white/10 rounded-lg px-2 py-1.5 text-xs font-bold"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-black uppercase text-white/30">Hub</label>
+                        <select
+                          value={String(editingValues.hubId || '')}
+                          onChange={(e) => setEditingValues((v) => ({ ...v, hubId: e.target.value }))}
+                          className="w-full bg-black/60 border border-white/10 rounded-lg px-2 py-1.5 text-xs font-bold"
+                        >
+                          {hubs.map((h) => (
+                            <option key={h.id} value={h.id}>{h.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1 mt-2">
+                      <label className="text-[8px] font-black uppercase text-white/30">Destination</label>
+                      <input
+                        value={String(editingValues.destination || '')}
+                        onChange={(e) => setEditingValues((v) => ({ ...v, destination: e.target.value }))}
+                        className="w-full bg-black/60 border border-white/10 rounded-lg px-2 py-1.5 text-xs font-bold"
+                      />
                     </div>
                     
                     <div className="grid grid-cols-2 gap-3">
@@ -473,12 +565,82 @@ export default function AdminFleet() {
                       </div>
                     </div>
 
+                    <div className="grid grid-cols-2 gap-3 mt-2">
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-black uppercase text-white/30">Seat Capacity</label>
+                        <input
+                          type="number"
+                          value={editingValues.seatCapacity ?? 45}
+                          onChange={(e) => setEditingValues((v) => ({ ...v, seatCapacity: Number(e.target.value) }))}
+                          className="w-full bg-black/60 border border-white/10 rounded-lg px-2 py-1.5 text-xs font-bold"
+                        />
+                      </div>
+                      <div className="flex items-end">
+                        <label className="inline-flex items-center gap-2 bg-black/60 border border-white/10 rounded-lg px-2 py-2 text-xs font-bold w-full">
+                          <input
+                            type="checkbox"
+                            checked={editingValues.approved !== false}
+                            onChange={(e) => setEditingValues((v) => ({ ...v, approved: e.target.checked }))}
+                          />
+                          Approved
+                        </label>
+                      </div>
+                    </div>
+
                     <button 
                       onClick={() => handleUpdateBus(bus.id)}
+                      disabled={busyBusId === bus.id}
                       className="w-full bg-yellow-400 text-black font-black uppercase text-[10px] py-3 rounded-xl mt-4 hover:bg-yellow-300 transition-colors"
                     >
-                      Apply Sync
+                      {busyBusId === bus.id ? 'Syncing...' : 'Apply Sync'}
                     </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <AnimatePresence>
+                {confirmDeleteId === bus.id && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 10 }}
+                    className="absolute inset-0 bg-zinc-900/95 rounded-3xl p-6 z-20 flex flex-col justify-between border-2 border-red-500/40 backdrop-blur-sm"
+                  >
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="text-[10px] font-black uppercase tracking-[0.2em] text-red-300">Confirm Delete</div>
+                        <button onClick={() => { setConfirmDeleteId(null); setDeleteReason(''); }}><X className="w-5 h-5" /></button>
+                      </div>
+                      <div className="text-sm font-black text-white">Delete {bus.tag}?</div>
+                      <div className="text-[11px] font-bold text-white/60">
+                        This is a soft delete. The bus will be removed from fleet lists and fare matrix, but historical records remain.
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-black uppercase text-white/30">Reason (optional)</label>
+                        <input
+                          value={deleteReason}
+                          onChange={(e) => setDeleteReason(e.target.value)}
+                          className="w-full bg-black/60 border border-white/10 rounded-lg px-2 py-2 text-xs font-bold"
+                          placeholder="e.g., retired vehicle"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 pt-4">
+                      <button
+                        onClick={() => { setConfirmDeleteId(null); setDeleteReason(''); }}
+                        className="w-full bg-white/10 text-white font-black uppercase text-[10px] py-3 rounded-xl border border-white/10"
+                        disabled={busyBusId === bus.id}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() => handleDeleteBus(bus.id)}
+                        className="w-full bg-red-500 text-white font-black uppercase text-[10px] py-3 rounded-xl border border-red-500/40"
+                        disabled={busyBusId === bus.id}
+                      >
+                        {busyBusId === bus.id ? 'Deleting...' : 'Delete'}
+                      </button>
+                    </div>
                   </motion.div>
                 )}
               </AnimatePresence>

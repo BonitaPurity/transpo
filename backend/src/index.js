@@ -21,6 +21,8 @@ dotenv.config({ path: path.join(__dirname, '..', '.env') });
 const PORT = process.env.PORT || 5000;
 const JWT_SECRET = process.env.JWT_SECRET || 'replace-with-a-secure-secret';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '2h';
+const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET || `${JWT_SECRET}_refresh`;
+const REFRESH_TOKEN_EXPIRES_IN = process.env.REFRESH_TOKEN_EXPIRES_IN || '14d';
 
 const app = express();
 app.set('trust proxy', 1);
@@ -186,12 +188,70 @@ function emitDeliveryUpdate(delivery) {
   });
 }
 
-function signToken(user) {
+function signAccessToken(user) {
   return jwt.sign(
     { id: user.id, email: user.email, role: user.role },
     JWT_SECRET,
     { expiresIn: JWT_EXPIRES_IN }
   );
+}
+
+function signRefreshToken(user) {
+  return jwt.sign(
+    { id: user.id, email: user.email, role: user.role, type: 'refresh' },
+    REFRESH_TOKEN_SECRET,
+    { expiresIn: REFRESH_TOKEN_EXPIRES_IN }
+  );
+}
+
+function decodeTokenExpiryIso(token) {
+  try {
+    const decoded = jwt.decode(token);
+    if (!decoded || typeof decoded !== 'object' || !decoded.exp) return null;
+    const ms = Number(decoded.exp) * 1000;
+    if (!Number.isFinite(ms)) return null;
+    return new Date(ms).toISOString();
+  } catch {
+    return null;
+  }
+}
+
+const refreshTokenStore = new Map();
+
+function cleanupExpiredRefreshTokens() {
+  const now = Date.now();
+  for (const [key, meta] of refreshTokenStore.entries()) {
+    if (!meta || !Number.isFinite(meta.expiresAtMs) || meta.expiresAtMs <= now) {
+      refreshTokenStore.delete(key);
+    }
+  }
+}
+
+function issueAuthTokens(user) {
+  cleanupExpiredRefreshTokens();
+  const accessToken = signAccessToken(user);
+  const refreshToken = signRefreshToken(user);
+  const refreshDecoded = jwt.decode(refreshToken);
+  const refreshExpiresAtMs = Number(refreshDecoded?.exp || 0) * 1000;
+  refreshTokenStore.set(refreshToken, {
+    userId: user.id,
+    email: user.email,
+    role: user.role,
+    expiresAtMs: Number.isFinite(refreshExpiresAtMs) ? refreshExpiresAtMs : (Date.now() + 14 * 24 * 60 * 60 * 1000),
+  });
+  return {
+    token: accessToken,
+    refreshToken,
+    expiresIn: JWT_EXPIRES_IN,
+    refreshExpiresIn: REFRESH_TOKEN_EXPIRES_IN,
+    tokenExpiresAt: decodeTokenExpiryIso(accessToken),
+    refreshTokenExpiresAt: decodeTokenExpiryIso(refreshToken),
+  };
+}
+
+function revokeRefreshToken(token) {
+  if (!token) return;
+  refreshTokenStore.delete(token);
 }
 
 function authenticateToken(req, res, next) {
@@ -367,14 +427,14 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
       phone: user.phone,
       role: user.role,
     };
-    const token = signToken(payload);
+    const tokens = issueAuthTokens(payload);
     try {
       await db.incrementUserAccess(user.id);
     } catch (err) {
       console.error('Access count update failed:', err);
     }
 
-    return res.json({ success: true, data: { user: payload, token, expiresIn: JWT_EXPIRES_IN } });
+    return res.json({ success: true, data: { user: payload, ...tokens } });
   } catch (error) {
     console.error('Login error:', error);
     return res.status(500).json({ success: false, message: 'Internal server error during login' });
@@ -408,9 +468,8 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
       phone: created.phone,
       role: created.role,
     };
-    const token = signToken(payload);
-
-    return res.status(201).json({ success: true, data: { user: payload, token, expiresIn: JWT_EXPIRES_IN } });
+    const tokens = issueAuthTokens(payload);
+    return res.status(201).json({ success: true, data: { user: payload, ...tokens } });
   } catch (error) {
     console.error('Registration error:', error);
     return res.status(500).json({ success: false, message: 'Internal server error during registration' });
@@ -420,6 +479,51 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
 app.get('/api/auth/me', authenticateToken, (req, res) => {
   const user = req.user;
   return res.json({ success: true, data: user });
+});
+
+app.post('/api/auth/refresh', authLimiter, async (req, res) => {
+  const refreshToken = String(req.body?.refreshToken || '').trim();
+  if (!refreshToken) {
+    return res.status(400).json({ success: false, message: 'refreshToken is required' });
+  }
+
+  try {
+    const payload = jwt.verify(refreshToken, REFRESH_TOKEN_SECRET);
+    if (!payload || payload.type !== 'refresh') {
+      revokeRefreshToken(refreshToken);
+      return res.status(401).json({ success: false, message: 'Invalid refresh token' });
+    }
+
+    const inStore = refreshTokenStore.get(refreshToken);
+    if (!inStore) {
+      return res.status(401).json({ success: false, message: 'Refresh token revoked or expired' });
+    }
+    if (String(inStore.userId) !== String(payload.id)) {
+      revokeRefreshToken(refreshToken);
+      return res.status(401).json({ success: false, message: 'Refresh token mismatch' });
+    }
+
+    const dbUser = await db.getUserById(payload.id);
+    const user = {
+      id: payload.id,
+      email: payload.email,
+      role: payload.role,
+      name: dbUser?.name || payload.email,
+      phone: dbUser?.phone || '',
+    };
+    revokeRefreshToken(refreshToken);
+    const tokens = issueAuthTokens(user);
+    return res.json({ success: true, data: { user, ...tokens } });
+  } catch {
+    revokeRefreshToken(refreshToken);
+    return res.status(401).json({ success: false, message: 'Invalid or expired refresh token' });
+  }
+});
+
+app.post('/api/auth/logout', (req, res) => {
+  const refreshToken = String(req.body?.refreshToken || '').trim();
+  revokeRefreshToken(refreshToken);
+  return res.json({ success: true, message: 'Logged out' });
 });
 
 app.post('/api/auth/change-password', authenticateToken, authLimiter, withAsync(async (req, res) => {
@@ -460,15 +564,31 @@ app.get('/api/schedules', async (req, res) => {
   res.json({ success: true, data: schedules });
 });
 
+function withTimeout(promise, ms, label) {
+  let timeoutId;
+  const timeout = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(label || `Timeout after ${ms}ms`)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timeoutId));
+}
+
+let departuresArchiveInFlight = null;
+function triggerDeparturesArchive() {
+  if (departuresArchiveInFlight) return;
+  departuresArchiveInFlight = withTimeout(db.archivePastDepartures(new Date()), 1500, 'Departure archive timeout')
+    .catch((err) => {
+      console.error('Departure archive failed:', err);
+    })
+    .finally(() => {
+      departuresArchiveInFlight = null;
+    });
+}
+
 // 4b. Get Departures (Today + next 2 days)
 app.get('/api/departures', async (req, res) => {
   try {
     const { hubId, startDate, includePast, windowStart, windowEnd } = req.query;
-    try {
-      await db.archivePastDepartures(new Date());
-    } catch (err) {
-      console.error('Departure archive failed:', err);
-    }
+    triggerDeparturesArchive();
     const localToday = () => {
       const d = new Date();
       const y = d.getFullYear();
@@ -495,7 +615,7 @@ app.get('/api/departures', async (req, res) => {
     endDt.setDate(endDt.getDate() + 2);
     const end = formatLocal(endDt);
 
-    const deps = await db.getDeparturesBetween(start, end, hubId);
+    const deps = await withTimeout(db.getDeparturesBetween(start, end, hubId), 8000, 'Departures query timeout');
     const enriched = await Promise.all(
       deps.map(async (d) => {
         const shouldIncludePast = includePast === 'true';
@@ -549,7 +669,11 @@ app.get('/api/departures', async (req, res) => {
         const occupied = d.occupiedSeats ?? (await db.countOccupiedSeats(d.id));
         const seatsAvailable = Math.max(0, seatCapacity - occupied);
         const expectedArrivalAt = db.computeExpectedArrivalAt(d.travelDate, d.departureTime, d.duration);
-        return { ...d, seatCapacity, occupiedSeats: occupied, seatsAvailable, isSoldOut: seatsAvailable <= 0, expectedArrivalAt };
+        // Use bus-specific fare if set, otherwise fall back to schedule/route baseline price
+        const effectivePrice = (d.busFareAmount !== null && d.busFareAmount !== undefined)
+          ? d.busFareAmount
+          : (d.price ?? 0);
+        return { ...d, price: effectivePrice, seatCapacity, occupiedSeats: occupied, seatsAvailable, isSoldOut: seatsAvailable <= 0, expectedArrivalAt };
       })
     );
     res.json({ success: true, data: enriched.filter(Boolean), range: { start, end } });
@@ -749,6 +873,25 @@ app.delete('/api/departures/:id', authenticateTokenOrBypassAdmin, async (req, re
   }
 });
 
+app.get('/api/fleet/live', authenticateToken, async (req, res) => {
+  const { hubId } = req.query;
+  const fleet = await db.getBuses(hubId);
+  const out = (fleet || []).map((b) => ({
+    id: b.id,
+    tag: b.tag,
+    hubId: b.hubId,
+    destination: b.destination || null,
+    status: b.status || null,
+    speed: Number.isFinite(Number(b.speed)) ? Number(b.speed) : 0,
+    battery: Number.isFinite(Number(b.battery)) ? Number(b.battery) : 0,
+    gpsLat: Number.isFinite(Number(b.gpsLat)) ? Number(b.gpsLat) : 0,
+    gpsLng: Number.isFinite(Number(b.gpsLng)) ? Number(b.gpsLng) : 0,
+    seatCapacity: Number.isFinite(Number(b.seatCapacity)) ? Number(b.seatCapacity) : null,
+    lastSeen: b.lastSeen || null,
+  }));
+  res.json({ success: true, data: out });
+});
+
 // 5. Fleet management (admin-only)
 app.get('/api/fleet', authenticateTokenOrBypassAdmin, async (req, res) => {
   const admin = requireAdmin(req, res);
@@ -785,6 +928,15 @@ app.post('/api/fleet', authenticateTokenOrBypassAdmin, async (req, res) => {
     seatCapacity: seatCapacity ?? 45,
     approved: approved ?? true,
   });
+  try {
+    await db.createAuditLog({
+      action: 'BUS_CREATED',
+      actor: { id: req.user?.id || null, email: req.user?.email || null, role: req.user?.role || null },
+      entityType: 'bus',
+      entityId: created?.id || busId,
+      details: { tag, hubId, destination, seatCapacity: seatCapacity ?? 45 },
+    });
+  } catch {}
   res.status(201).json({ success: true, data: created });
 });
 
@@ -800,7 +952,45 @@ app.put('/api/fleet/:id', authenticateTokenOrBypassAdmin, async (req, res) => {
   }
 
   const updated = await db.updateBus(id, updates);
+  if (!updated) {
+    return res.status(400).json({ success: false, message: 'Bus cannot be updated (may be deleted)' });
+  }
+  try {
+    await db.createAuditLog({
+      action: 'BUS_UPDATED',
+      actor: { id: req.user?.id || null, email: req.user?.email || null, role: req.user?.role || null },
+      entityType: 'bus',
+      entityId: id,
+      details: { updates },
+    });
+  } catch {}
   res.json({ success: true, data: updated });
+});
+
+app.delete('/api/fleet/:id', authenticateTokenOrBypassAdmin, async (req, res) => {
+  const admin = requireAdmin(req, res);
+  if (!admin) return;
+
+  const { id } = req.params;
+  const existing = await db.getBusById(id);
+  if (!existing) {
+    return res.status(404).json({ success: false, message: 'Bus not found' });
+  }
+  const reason = req.body?.reason ? String(req.body.reason).trim().slice(0, 500) : '';
+  const deleted = await db.softDeleteBus(id, { id: req.user?.id, email: req.user?.email });
+  if (!deleted) {
+    return res.status(500).json({ success: false, message: 'Failed to delete bus' });
+  }
+  try {
+    await db.createAuditLog({
+      action: 'BUS_DELETED',
+      actor: { id: req.user?.id || null, email: req.user?.email || null, role: req.user?.role || null },
+      entityType: 'bus',
+      entityId: id,
+      details: { reason },
+    });
+  } catch {}
+  res.json({ success: true, data: deleted });
 });
 
 app.get('/api/fleet/:id/telemetry', async (req, res) => {
@@ -1234,7 +1424,7 @@ app.get('/api/deliveries/quote/:departureId', authenticateToken, async (req, res
     if (!departure) return res.status(404).json({ success: false, message: 'Departure not found' });
     const bus = await db.getBusById(departure.busId);
     if (!bus || !bus.approved) return res.status(403).json({ success: false, message: 'Bus is not approved' });
-    const fee = (await db.getDeliveryFeeByBus(bus.id)) ?? 5000;
+    const fee = (await db.getDeliveryFeeByBus(bus.id)) ?? 10000;
     res.json({ success: true, data: { feeAmount: fee, busId: bus.id, busTag: bus.tag, travelDate: departure.travelDate } });
   } catch (error) {
     console.error('Delivery quote failed:', error);
@@ -1330,6 +1520,83 @@ app.get('/api/metrics/detailed', authenticateToken, async (req, res) => {
   if (!requireAdmin(req, res)) return;
   const metrics = await db.getReportingMetrics();
   res.json({ success: true, data: metrics });
+});
+
+app.get('/api/metrics/export', authenticateToken, async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const format = String(req.query.format || '').toLowerCase();
+  const metrics = await db.getReportingMetrics();
+  const stats = await db.getStats();
+  const dateKey = new Date().toISOString().split('T')[0];
+
+  // Build flat rows: KPIs + challenges
+  const kpiRows = [
+    ["KPI", "Value", "Notes"],
+    ["Today's Bookings",       String(metrics.todayBookings),  "Bookings created today"],
+    ["Today's Revenue",        `UGX ${Number(metrics.todayRevenue).toLocaleString()}`, "Completed ticket payments today"],
+    ["Today's Delivery Fees",  `UGX ${Number(metrics.todayDeliveryRevenue || 0).toLocaleString()}`, "Completed delivery payments today"],
+    ["On-Time Rate",           metrics.onTimeRate,              "Based on active schedules"],
+    ["Total Buses",            String(stats.totalBuses),        "All registered buses"],
+    ["Total Bookings",         String(stats.totalBookings),     "All-time bookings"],
+    ["Total Revenue",          `UGX ${Number(stats.totalRevenue).toLocaleString()}`, "All-time completed ticket payments"],
+    ["Total Delivery Revenue", `UGX ${Number(stats.totalDeliveryRevenue || 0).toLocaleString()}`, "All-time completed delivery fees"],
+    ["Active Schedules",       String(stats.activeSchedules),  "Schedules with On Time status"],
+  ];
+
+  const challengeRows = [
+    [],
+    ["ACTIVE CHALLENGES", "", "", "", ""],
+    ["Title", "Severity", "Status", "Metric", "Solution"],
+    ...(metrics.challenges || []).map(c => [
+      c.title,
+      c.severity,
+      c.status,
+      c.metric,
+      c.solution,
+    ]),
+  ];
+
+  if (format === 'csv') {
+    const allRows = [...kpiRows, ...challengeRows];
+    const csvContent = allRows.map(r => r.map(v => `"${String(v || '').replace(/"/g, '""')}"`).join(',')).join('\n');
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename=TRANSPO_OPS_INTELLIGENCE_${dateKey}.csv`);
+    return res.send(csvContent);
+  }
+
+  if (format === 'pdf') {
+    const lang = pickLang(req);
+    const columns = [
+      { label: 'Title / KPI',   width: 160 },
+      { label: 'Severity',      width: 70 },
+      { label: 'Status',        width: 90 },
+      { label: 'Metric',        width: 80 },
+      { label: 'Solution',      width: 160 },
+    ];
+    // KPI summary rows first
+    const kpiPdfRows = [
+      ["Today's Bookings",       metrics.todayBookings,  '-', '-', 'Bookings created today'],
+      ["Today's Revenue",        `UGX ${Number(metrics.todayRevenue).toLocaleString()}`, '-', '-', 'Completed ticket payments today'],
+      ["Today's Delivery Fees",  `UGX ${Number(metrics.todayDeliveryRevenue || 0).toLocaleString()}`, '-', '-', 'Completed delivery payments today'],
+      ["On-Time Rate",           '-', '-', metrics.onTimeRate, 'Based on active schedules'],
+      ["Total Buses",            stats.totalBuses, '-', '-', 'All registered buses'],
+      ["Total Revenue",          `UGX ${Number(stats.totalRevenue).toLocaleString()}`, '-', '-', 'All-time completed ticket payments'],
+      ["Total Delivery Revenue", `UGX ${Number(stats.totalDeliveryRevenue || 0).toLocaleString()}`, '-', '-', 'All-time completed delivery fees'],
+    ];
+    const challengePdfRows = (metrics.challenges || []).map(c => [
+      c.title, c.severity, c.status, c.metric, c.solution,
+    ]);
+    return sendPdf(res, {
+      filename: `TRANSPO_OPS_INTELLIGENCE_${dateKey}.pdf`,
+      title: 'Ops Intelligence Report',
+      subtitle: `Generated: ${dateKey} · Challenges: ${(metrics.challenges || []).length} · On-Time: ${metrics.onTimeRate}`,
+      columns,
+      rows: [...kpiPdfRows, ...challengePdfRows],
+      lang,
+    });
+  }
+
+  res.json({ success: true, data: { metrics, stats, generatedAt: new Date().toISOString() } });
 });
 
 app.get('/api/admin/manifest/export', authenticateToken, async (req, res) => {
@@ -1768,50 +2035,90 @@ app.post('/api/admin/scenario', authenticateToken, async (req, res) => {
   const buses = await db.getBuses();
   let affectedCount = 0;
 
+  // Helper: upsert a scenario challenge into the challenges table
+  async function upsertScenarioChallenge({ id, severity, title, detail, metric, solution, impact, status }) {
+    await db.upsertChallenge({ id, severity, title, detail, metric, solution, impact, status, scenarioGenerated: true });
+  }
+
   if (scenario === 'battery_low') {
     const target = buses.find(b => b.battery > 50);
     if (target) {
-      await db.updateBusStatus(target.id, 'Critical', 12);
-      await db.createAlert('warning', `Simulated Failure: Unit ${target.tag} battery dropped to 12%`);
       affectedCount = 1;
+      await upsertScenarioChallenge({
+        id: 'scenario_battery_low',
+        severity: 'critical',
+        title: `Unit ${target.tag} Battery Critical`,
+        detail: `Simulated failure: Unit ${target.tag} battery dropped to 12%. Immediate charging required to prevent service disruption.`,
+        metric: '12% battery',
+        solution: `Reroute ${target.tag} passengers to next available bus and dispatch to nearest charging bay immediately.`,
+        impact: 'Service disruption avoided within 45 min',
+        status: 'action_required',
+      });
+      await db.createAlert('warning', `Simulated Failure: Unit ${target.tag} battery dropped to 12%`);
     }
-  } 
+  }
   else if (scenario === 'traffic_delay') {
-    for (const b of buses) {
-      if (b.status === 'En Route' || b.status === 'Active') {
-        await db.updateBusStatus(b.id, 'Delayed', b.battery);
-        affectedCount++;
-      }
-    }
+    affectedCount = buses.filter(b => b.status === 'En Route' || b.status === 'Active').length;
+    await upsertScenarioChallenge({
+      id: 'scenario_traffic_delay',
+      severity: 'warning',
+      title: 'CBD Gridlock — Mass Traffic Delay',
+      detail: `Heavy congestion simulated on major CBD arteries. ${affectedCount} en-route units affected. Estimated delay: 25–40 min.`,
+      metric: `${affectedCount} units delayed`,
+      solution: 'Activate alternate routing via Northern Bypass. Notify passengers via SMS of expected delays.',
+      impact: 'Delay reduced from 40 min to 15 min',
+      status: 'in_progress',
+    });
     await db.createAlert('info', 'Traffic Advisory: Heavy congestion simulated on major arteries.');
   }
   else if (scenario === 'hub_congestion') {
-    await db.createAlert('warning', 'Terminal Alert: Hub reporting 98% bay occupancy.');
     affectedCount = 1;
+    await upsertScenarioChallenge({
+      id: 'scenario_hub_congestion',
+      severity: 'warning',
+      title: 'Hub Terminal Near Capacity',
+      detail: 'Hub reporting 98% bay occupancy. Only 1 bay available. Incoming buses risk queuing on access road.',
+      metric: '98% bay load',
+      solution: 'Activate overflow routing to secondary staging area. Hold 3 inbound units at 2km holding point.',
+      impact: '-35% congestion within 20 min',
+      status: 'action_required',
+    });
+    await db.createAlert('warning', 'Terminal Alert: Hub reporting 98% bay occupancy.');
   }
   else if (scenario === 'weather_emergency') {
-    for (const b of buses) {
-      if (b.status === 'En Route' || b.status === 'Delayed') {
-        await db.updateBus(b.id, { speed: Math.floor(b.speed * 0.4) });
-        affectedCount++;
-      }
-    }
+    affectedCount = buses.filter(b => b.status === 'En Route' || b.status === 'Delayed').length;
+    await upsertScenarioChallenge({
+      id: 'scenario_weather_emergency',
+      severity: 'critical',
+      title: 'Weather Emergency — Speed Restriction Active',
+      detail: `Torrential rain advisory issued. All en-route units restricted to 40% max speed. ${affectedCount} buses affected. ETA delays expected across all routes.`,
+      metric: `${affectedCount} units restricted`,
+      solution: 'Issue passenger delay notifications. Extend departure windows by 30 min. Monitor road conditions every 15 min.',
+      impact: 'Passenger safety maintained. Delays communicated proactively.',
+      status: 'monitoring',
+    });
     await db.createAlert('warning', 'Weather Emergency: Global speed restriction active (40% max).');
   }
   else if (scenario === 'hub_offline') {
     const targetHub = hubId || 'h1';
-    await db.createAlert('critical', `Infrastructure Alert: ${targetHub === 'h1' ? 'Namanve' : 'Regional'} Hub offline due to power failure.`);
+    const hubName = targetHub === 'h1' ? 'Namanve' : 'Regional';
     affectedCount = 1;
+    await upsertScenarioChallenge({
+      id: 'scenario_hub_offline',
+      severity: 'critical',
+      title: `${hubName} Hub Power Failure`,
+      detail: `${hubName} Hub is offline due to total power failure. All charging services suspended. Buses cannot depart or arrive until power is restored.`,
+      metric: 'Hub offline',
+      solution: `Activate generator backup. Reroute all ${hubName} Hub departures to nearest operational hub. ETA for power restoration: 2 hrs.`,
+      impact: 'Service continuity maintained via rerouting',
+      status: 'action_required',
+    });
+    await db.createAlert('critical', `Infrastructure Alert: ${hubName} Hub offline due to power failure.`);
   }
   else if (scenario === 'reset') {
-    for (const b of buses) {
-      await db.updateBus(b.id, { 
-        status: 'En Route', 
-        speed: 65, 
-        battery: Math.max(b.battery, 85) 
-      });
-    }
-    await db.createAlert('ok', 'System Reset: All units restored to nominal parameters.');
+    // Remove all scenario-generated challenges
+    await db.clearScenarioChallenges();
+    await db.createAlert('ok', 'System Reset: All scenario challenges cleared. Network nominal.');
     affectedCount = buses.length;
   }
   else {
@@ -1819,6 +2126,12 @@ app.post('/api/admin/scenario', authenticateToken, async (req, res) => {
   }
 
     res.json({ success: true, message: `Scenario ${scenario} active. Affected units: ${affectedCount}` });
+
+    // Emit latest alerts via socket so Digital Twin Events panel updates immediately
+    try {
+      const latestAlerts = await db.getAlerts();
+      io.emit('alerts_update', latestAlerts.slice(0, 10));
+    } catch {}
   } catch (error) {
     console.error('Error triggering scenario:', error);
     res.status(500).json({ success: false, message: 'Internal server error while triggering scenario' });
@@ -2028,6 +2341,12 @@ async function autoMarkArrivedDeliveriesForBus({ busId, gpsLat, gpsLng, destinat
   }
 }
 
+// Use a slower interval for JSON file storage to avoid .tmp file accumulation.
+// Postgres can handle 1s; JSON files need breathing room (4s default).
+const SIM_INTERVAL_MS = process.env.SIM_INTERVAL_MS
+  ? Math.max(500, Number(process.env.SIM_INTERVAL_MS))
+  : (db.getDbMode() === 'postgres' ? 1000 : 4000);
+
 async function startSimulation() {
   setInterval(async () => {
     try {
@@ -2035,12 +2354,23 @@ async function startSimulation() {
       
       // Process bus positions sequentially to handle async awaits properly
       for (const bus of buses) {
+        // Track the latest position/battery/speed so telemetry is never stale
+        let telemetrySnapshot = {
+          battery: bus.battery,
+          speed: bus.speed,
+          gpsLat: bus.gpsLat,
+          gpsLng: bus.gpsLng,
+          status: bus.status,
+        };
+
         // 1. Charging Simulation
         if (bus.status === 'Charging') {
           const newBattery = Math.min(100, bus.battery + 2);
           await db.updateBusStatus(bus.id, 'Charging', newBattery);
+          telemetrySnapshot.battery = newBattery;
           if (newBattery === 100) {
             await db.updateBusStatus(bus.id, 'Active');
+            telemetrySnapshot.status = 'Active';
             await db.createAlert('ok', `${bus.tag} fully charged and ready for service.`);
           }
         } 
@@ -2060,11 +2390,12 @@ async function startSimulation() {
           const dest = CITY_COORDS[currentBus.destination];
           if (!dest) {
             // Keep admin-defined routes visibly active even when destination is custom/unknown.
-            await db.updateBusPosition(bus.id, roamAroundCurrentPosition(currentBus));
+            const roamed = roamAroundCurrentPosition(currentBus);
+            await db.updateBusPosition(bus.id, roamed);
+            telemetrySnapshot = { ...telemetrySnapshot, ...roamed };
             continue;
           }
 
-          // Origin coordinate approximation for the path calculation (snapping current bus to start of new path)
           if (!busPathProgress[currentBus.id]) {
               busPathProgress[currentBus.id] = { index: 0, path: [] };
           }
@@ -2072,7 +2403,6 @@ async function startSimulation() {
           let currentPath = busPathProgress[currentBus.id].path;
           
           if (currentPath.length === 0) {
-              // First time getting path for this destination
               const fetched = await getOrFetchOSRMRoute(currentBus.gpsLat, currentBus.gpsLng, dest.lat, dest.lng);
               if (fetched) {
                   currentPath = fetched;
@@ -2090,13 +2420,9 @@ async function startSimulation() {
               const dist = Math.sqrt(dLat * dLat + dLng * dLng);
 
               if (dist < step) {
-                await db.updateBusPosition(bus.id, {
-                  gpsLat: dest.lat,
-                  gpsLng: dest.lng,
-                  battery: Math.max(0, currentBus.battery - 1),
-                  status: 'Arrived',
-                  speed: 0
-                });
+                const arrivedPos = { gpsLat: dest.lat, gpsLng: dest.lng, battery: Math.max(0, currentBus.battery - 1), status: 'Arrived', speed: 0 };
+                await db.updateBusPosition(bus.id, arrivedPos);
+                telemetrySnapshot = { ...telemetrySnapshot, ...arrivedPos };
                 await autoMarkArrivedDeliveriesForBus({ busId: bus.id, gpsLat: dest.lat, gpsLng: dest.lng, destinationName: currentBus.destination });
                 await db.createAlert('info', `${currentBus.tag} has arrived at destination: ${currentBus.destination}`);
                 delete busPathProgress[currentBus.id];
@@ -2107,14 +2433,10 @@ async function startSimulation() {
                 const speed = Math.max(0, (60 + Math.random() * 20) * delayedFactor * (currentBus.speed === 5 ? 0.1 : 1));
                 const batteryDrain = 0.1 + (Math.random() * 0.05);
                 const newBattery = Math.max(0, currentBus.battery - batteryDrain);
+                const newPos = { gpsLat: newLat, gpsLng: newLng, battery: newBattery, status: currentBus.status, speed };
 
-                await db.updateBusPosition(bus.id, {
-                  gpsLat: newLat,
-                  gpsLng: newLng,
-                  battery: newBattery,
-                  status: currentBus.status,
-                  speed: speed
-                });
+                await db.updateBusPosition(bus.id, newPos);
+                telemetrySnapshot = { ...telemetrySnapshot, ...newPos };
                 await autoMarkArrivedDeliveriesForBus({ busId: bus.id, gpsLat: newLat, gpsLng: newLng, destinationName: currentBus.destination });
 
                 if (newBattery < 20 && currentBus.battery >= 20) {
@@ -2122,28 +2444,21 @@ async function startSimulation() {
                 }
               }
           } else {
-              // Advance along cached path
               const progress = busPathProgress[currentBus.id];
               if (!progress) {
                 busPathProgress[currentBus.id] = { index: 0, path: currentPath || [] };
               }
               const { index, path } = busPathProgress[currentBus.id];
-              // Step size depends on speed (very rough approximation here: step by X indices)
               const speedFactorBase = Math.max(1, Math.floor(currentBus.speed / 20));
               const speedFactor = currentBus.status === 'Delayed' ? Math.max(1, Math.floor(speedFactorBase * 0.6)) : speedFactorBase;
               
               let nextIndex = index + speedFactor;
               
               if (nextIndex >= path.length) {
-                  // Arrived
                   const lastPoint = path[path.length - 1];
-                  await db.updateBusPosition(bus.id, {
-                      gpsLat: lastPoint[0],
-                      gpsLng: lastPoint[1],
-                      battery: Math.max(0, currentBus.battery - 1),
-                      status: 'Arrived',
-                      speed: 0
-                  });
+                  const arrivedPos = { gpsLat: lastPoint[0], gpsLng: lastPoint[1], battery: Math.max(0, currentBus.battery - 1), status: 'Arrived', speed: 0 };
+                  await db.updateBusPosition(bus.id, arrivedPos);
+                  telemetrySnapshot = { ...telemetrySnapshot, ...arrivedPos };
                   await autoMarkArrivedDeliveriesForBus({ busId: bus.id, gpsLat: lastPoint[0], gpsLng: lastPoint[1], destinationName: currentBus.destination });
                   await db.createAlert('info', `${currentBus.tag} has arrived at destination: ${currentBus.destination}`);
                   delete busPathProgress[currentBus.id];
@@ -2153,14 +2468,10 @@ async function startSimulation() {
                   const speed = Math.max(0, (60 + Math.random() * 20) * delayedFactor * (currentBus.speed === 5 ? 0.1 : 1));
                   const batteryDrain = 0.1 + (Math.random() * 0.05);
                   const newBattery = Math.max(0, currentBus.battery - batteryDrain);
+                  const newPos = { gpsLat: nextPoint[0], gpsLng: nextPoint[1], battery: newBattery, status: currentBus.status, speed };
 
-                  await db.updateBusPosition(bus.id, {
-                      gpsLat: nextPoint[0],
-                      gpsLng: nextPoint[1],
-                      battery: newBattery,
-                      status: currentBus.status,
-                      speed: speed
-                  });
+                  await db.updateBusPosition(bus.id, newPos);
+                  telemetrySnapshot = { ...telemetrySnapshot, ...newPos };
                   await autoMarkArrivedDeliveriesForBus({ busId: bus.id, gpsLat: nextPoint[0], gpsLng: nextPoint[1], destinationName: currentBus.destination });
                   
                   if (busPathProgress[currentBus.id]) {
@@ -2176,21 +2487,22 @@ async function startSimulation() {
           }
         }
 
+        // Log and emit using the up-to-date snapshot, not the stale loop variable
         await db.logTelemetry(bus.id, {
-          battery: bus.battery,
-          speed: bus.speed,
-          gpsLat: bus.gpsLat,
-          gpsLng: bus.gpsLng
+          battery: telemetrySnapshot.battery,
+          speed: telemetrySnapshot.speed,
+          gpsLat: telemetrySnapshot.gpsLat,
+          gpsLng: telemetrySnapshot.gpsLng,
         });
 
         io.emit('telemetry_update', {
           busId: bus.id,
           tag: bus.tag,
-          status: bus.status,
-          battery: bus.battery,
-          speed: bus.speed,
-          gpsLat: bus.gpsLat,
-          gpsLng: bus.gpsLng
+          status: telemetrySnapshot.status,
+          battery: telemetrySnapshot.battery,
+          speed: telemetrySnapshot.speed,
+          gpsLat: telemetrySnapshot.gpsLat,
+          gpsLng: telemetrySnapshot.gpsLng,
         });
       }
 
@@ -2199,7 +2511,7 @@ async function startSimulation() {
     } catch (err) {
       console.error('Simulation step error:', err);
     }
-  }, 1000);
+  }, SIM_INTERVAL_MS);
 }
 
 // Global start
@@ -2207,6 +2519,26 @@ async function bootstrap() {
     try {
         if (process.env.NODE_ENV === 'production' && JWT_SECRET === 'replace-with-a-secure-secret') {
             throw new Error('JWT_SECRET must be set in production');
+        }
+
+        // Clean up leftover .tmp files from previous interrupted atomic writes
+        if (db.getDbMode && db.getDbMode() !== 'postgres') {
+            try {
+                const dataDir = process.env.JSON_STORAGE_DIR
+                    ? path.resolve(process.env.JSON_STORAGE_DIR)
+                    : path.join(__dirname, '..', 'data');
+                if (fs.existsSync(dataDir)) {
+                    const tmpFiles = fs.readdirSync(dataDir).filter((f) => f.endsWith('.tmp'));
+                    for (const f of tmpFiles) {
+                        try { fs.unlinkSync(path.join(dataDir, f)); } catch {}
+                    }
+                    if (tmpFiles.length > 0) {
+                        console.log(`Cleaned up ${tmpFiles.length} stale .tmp file(s) from data directory.`);
+                    }
+                }
+            } catch (cleanupErr) {
+                console.warn('Non-fatal: .tmp cleanup failed:', cleanupErr.message);
+            }
         }
 
         console.log('PostgreSQL: Initializing Operational Nexus...');
@@ -2223,6 +2555,7 @@ async function bootstrap() {
                 }
             }, 60000);
 
+            console.log(`Simulation interval: ${SIM_INTERVAL_MS}ms`);
             startSimulation();
             server.listen(PORT, () => {
                 console.log(`Backend server running on port ${PORT} (${useHttps ? 'https' : 'http'}) with Real-Time Nexus (Socket.io) active`);

@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { useEffect, useState } from 'react';
 import {
   Bus, Users, TicketCheck, Activity,
-  TrendingUp, AlertCircle, ShieldCheck, Database, Zap, Clock, Construction
+  TrendingUp, AlertCircle, ShieldCheck, Database, Zap, Clock, Construction, Truck
 } from 'lucide-react';
 import { apiService } from '@/services/api';
 import { useAuth } from '@/context/AuthContext';
@@ -15,6 +15,7 @@ interface Stats {
   totalBookings: number;
   totalRevenue: number;
   activeSchedules: number;
+  totalDeliveryRevenue: number;
 }
 
 interface Booking {
@@ -87,10 +88,11 @@ export default function AdminOverview() {
   }, [user]);
 
   const STAT_CARDS = [
-    { label: 'Total Buses',      value: stats?.totalBuses || '0',    sub: 'Fleet Size',       icon: Bus,          color: '#facc15' },
-    { label: 'Total Bookings',   value: stats?.totalBookings || '0', sub: 'Across All Hubs',  icon: Users,        color: '#38bdf8' },
-    { label: 'Total Revenue',    value: `UGX ${(stats?.totalRevenue || 0).toLocaleString()}`, sub: 'Ticket Sales', icon: TicketCheck,  color: '#4ade80' },
-    { label: 'Active Schedules', value: stats?.activeSchedules || '0', sub: 'On Time',         icon: ShieldCheck,  color: '#fb923c' },
+    { label: 'Total Buses',           value: stats?.totalBuses || '0',    sub: 'Fleet Size',        icon: Bus,          color: '#facc15' },
+    { label: 'Total Bookings',        value: stats?.totalBookings || '0', sub: 'Across All Hubs',   icon: Users,        color: '#38bdf8' },
+    { label: 'Ticket Revenue',        value: `UGX ${(stats?.totalRevenue || 0).toLocaleString()}`, sub: 'Ticket Sales', icon: TicketCheck, color: '#4ade80' },
+    { label: 'Delivery Revenue',      value: `UGX ${(stats?.totalDeliveryRevenue || 0).toLocaleString()}`, sub: 'Delivery Fees Collected', icon: Truck, color: '#a78bfa' },
+    { label: 'Active Schedules',      value: stats?.activeSchedules || '0', sub: 'On Time',          icon: ShieldCheck,  color: '#fb923c' },
   ];
 
 // Mock alerts removed - now fetched from API
@@ -104,7 +106,7 @@ export default function AdminOverview() {
       </header>
 
       {/* KPI Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
         {STAT_CARDS.map((s, i) => (
           <motion.div
             key={s.label}

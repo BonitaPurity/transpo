@@ -9,10 +9,10 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   return (
-    <div className="flex min-h-screen relative overflow-x-hidden bg-white dark:bg-black">
+    <div className="flex min-h-screen relative overflow-x-hidden bg-white text-black">
       {/* Sidebar - Desktop */}
-      <div className="hidden lg:block shrink-0 border-r-4 border-yellow-400">
-        <div className="sticky top-0 h-screen w-64 xl:w-80">
+      <div className="hidden lg:block shrink-0">
+        <div className="sticky top-0 h-screen w-72 xl:w-80">
           <Sidebar />
         </div>
       </div>
@@ -42,32 +42,34 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
       </AnimatePresence>
 
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-20 bg-black text-yellow-400 flex items-center px-6 lg:px-10 border-b-4 border-yellow-400 sticky top-0 z-30 justify-between">
-          <div className="flex items-center gap-4">
+        <header className="sticky top-0 z-30 border-b-2 border-black bg-white">
+          <div className="ui-container h-20 flex items-center justify-between gap-4">
             <button 
               onClick={() => setIsSidebarOpen(true)}
-              className="lg:hidden p-3 bg-zinc-900 border-2 border-yellow-400/30 rounded-2xl hover:bg-zinc-800 transition-all active:scale-95"
+              className="ui-icon-btn shrink-0 lg:hidden"
             >
                <Menu className="w-6 h-6" />
             </button>
-            <div className="flex items-center gap-3">
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(34,197,94,0.5)]" />
-              <span className="font-black text-[10px] lg:text-xs tracking-widest uppercase whitespace-nowrap opacity-80">Local Core Sync Active</span>
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-3 h-3 shrink-0 bg-green-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(34,197,94,0.5)]" />
+              <span className="font-black text-xs sm:text-sm md:text-base tracking-wide uppercase truncate">
+                Local Core Sync Active
+              </span>
             </div>
-          </div>
           
-          <div className="flex items-center gap-6">
-             <div className="text-right hidden sm:block">
-                <div className="text-[10px] font-black uppercase tracking-widest text-white/30 italic">Fleet Hub Uganda</div>
-                <div className="text-xs font-black uppercase text-yellow-400 tracking-tighter">Operational Nexus 41</div>
-             </div>
-             <div className="w-10 h-10 rounded-full bg-yellow-400/10 border border-yellow-400/20 flex items-center justify-center">
-                <Zap className="w-4 h-4 text-yellow-400 animate-pulse" />
-             </div>
+            <div className="flex items-center gap-4 shrink-0">
+               <div className="text-right hidden sm:block">
+                  <div className="text-sm font-semibold text-black/70">Fleet Hub Uganda</div>
+                  <div className="text-base font-black uppercase tracking-tight">Operational Nexus</div>
+               </div>
+               <div className="w-11 h-11 rounded-xl bg-yellow-400 border-2 border-black flex items-center justify-center">
+                  <Zap className="w-6 h-6 text-black" />
+               </div>
+            </div>
           </div>
         </header>
 
-        <main className="flex-1 p-6 lg:p-12 overflow-x-hidden">
+        <main className="flex-1 overflow-x-hidden">
           {children}
         </main>
       </div>

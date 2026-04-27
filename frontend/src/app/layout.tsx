@@ -35,7 +35,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" data-theme="light" suppressHydrationWarning>
       <body className={`${geist.className} bg-white antialiased`} suppressHydrationWarning>
         <AuthProvider>
           <SocketProvider>

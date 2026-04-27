@@ -52,6 +52,7 @@ describe(testDbUrl ? 'Backend booking API' : 'Backend booking API (skipped: no T
   it('creates a booking successfully', async () => {
     const response = await request(app)
       .post('/api/bookings')
+      .set('Authorization', `Bearer ${userToken}`)
       .send({
         scheduleId: 'sch_01',
         passengerName: 'John Doe',

@@ -12,6 +12,9 @@ export interface User {
   email: string;
   role: UserRole;
   token?: string;
+  refreshToken?: string;
+  tokenExpiresAt?: string | null;
+  refreshTokenExpiresAt?: string | null;
 }
 
 interface AuthContextType {
@@ -40,12 +43,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await new Promise(resolve => setTimeout(resolve, 0));
       
       if (restored) {
-        setUser(JSON.parse(restored));
+        try {
+          const parsed = JSON.parse(restored);
+          if (parsed?.token) {
+            const me = await apiService.getMe();
+            if (me?.success && me?.data) {
+              const hydratedUser: User = {
+                ...parsed,
+                ...me.data,
+                token: parsed.token,
+                refreshToken: parsed.refreshToken,
+                tokenExpiresAt: parsed.tokenExpiresAt || null,
+                refreshTokenExpiresAt: parsed.refreshTokenExpiresAt || null,
+              };
+              setUser(hydratedUser);
+              localStorage.setItem('transpo_user', JSON.stringify(hydratedUser));
+            } else {
+              localStorage.removeItem('transpo_user');
+            }
+          } else {
+            localStorage.removeItem('transpo_user');
+          }
+        } catch {
+          localStorage.removeItem('transpo_user');
+        }
       }
       setIsLoading(false);
       initialized.current = true;
     };
     initAuth();
+  }, []);
+
+  useEffect(() => {
+    const onUnauthorized = () => {
+      setUser(null);
+      try {
+        localStorage.removeItem('transpo_user');
+      } catch {}
+    };
+    window.addEventListener('transpo_unauthorized', onUnauthorized);
+    return () => window.removeEventListener('transpo_unauthorized', onUnauthorized);
   }, []);
 
 
@@ -66,9 +103,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email: response.data?.user?.email || response.data?.email,
         role: (response.data?.user?.role || response.data?.role) as UserRole,
         token: response.data?.token,
+        refreshToken: response.data?.refreshToken,
+        tokenExpiresAt: response.data?.tokenExpiresAt || null,
+        refreshTokenExpiresAt: response.data?.refreshTokenExpiresAt || null,
       };
 
-      if (!newUser.token) {
+      if (!newUser.token || !newUser.refreshToken) {
         return false;
       }
       setUser(newUser);
@@ -81,21 +121,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const adminLogin = async (email: string, password: string): Promise<boolean> => {
-    const success = await login(email, password);
-    if (!success) return false;
-    
-    // Additional check to ensure it's an admin
-    const saved = localStorage.getItem('transpo_user');
-    if (saved) {
-      const u = JSON.parse(saved);
-      if (u.role === 'admin') return true;
+    try {
+      const response = await apiService.login({ email, password });
+      if (!response?.success) return false;
+
+      const role = response.data?.user?.role || response.data?.role;
+      if (role !== 'admin') return false;
+
+      const newUser: User = {
+        id: response.data?.user?.id || response.data?.id,
+        name: response.data?.user?.name || response.data?.name,
+        phone: response.data?.user?.phone || response.data?.phone || 'N/A',
+        email: response.data?.user?.email || response.data?.email,
+        role: role as UserRole,
+        token: response.data?.token,
+        refreshToken: response.data?.refreshToken,
+        tokenExpiresAt: response.data?.tokenExpiresAt || null,
+        refreshTokenExpiresAt: response.data?.refreshTokenExpiresAt || null,
+      };
+
+      if (!newUser.token || !newUser.refreshToken) return false;
+
+      setUser(newUser);
+      localStorage.setItem('transpo_user', JSON.stringify(newUser));
+      return true;
+    } catch (err) {
+      console.error('Admin login failed', err);
+      return false;
     }
-    
-    logout(); // Log out if not admin
-    return false;
   };
 
   const logout = () => {
+    try {
+      const saved = localStorage.getItem('transpo_user');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed?.refreshToken) {
+          apiService.logout(parsed.refreshToken).catch(() => {});
+        }
+      }
+    } catch {}
     setUser(null);
     localStorage.removeItem('transpo_user');
   };

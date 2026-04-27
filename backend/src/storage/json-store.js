@@ -6,6 +6,13 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function lockWaitMs() {
+  const raw = process.env.JSON_READ_LOCK_WAIT_MS;
+  const n = Number(raw);
+  if (Number.isFinite(n) && n > 0) return n;
+  return 1500;
+}
+
 function nowIso() {
   return new Date().toISOString();
 }
@@ -211,18 +218,52 @@ class JsonStore {
     await this._atomicWrite(file, doc);
   }
 
+  async _readEntityBestEffortNoLock(entity) {
+    await this.ensureEntity(entity);
+    const doc = await this._readEntityWithRecoveryUnsafe(entity);
+    return doc;
+  }
+
   async readAll(entity) {
-    return this.withLock(entity, async () => {
-      const doc = await this._readEntityWithRecoveryUnsafe(entity);
+    const waitMs = lockWaitMs();
+    const locked = this.withLock(entity, async () => {
+        const doc = await this._readEntityWithRecoveryUnsafe(entity);
+        return doc.records;
+      });
+
+    const timed = Promise.race([
+      locked,
+      sleep(waitMs).then(() => ({ __lockWaitTimedOut: true })),
+    ]);
+
+    const out = await timed;
+    if (out && out.__lockWaitTimedOut) {
+      locked.catch(() => undefined);
+      const doc = await this._readEntityBestEffortNoLock(entity);
       return doc.records;
-    });
+    }
+    return out;
   }
 
   async readById(entity, id) {
-    return this.withLock(entity, async () => {
-      const doc = await this._readEntityWithRecoveryUnsafe(entity);
+    const waitMs = lockWaitMs();
+    const locked = this.withLock(entity, async () => {
+        const doc = await this._readEntityWithRecoveryUnsafe(entity);
+        return doc.records.find((r) => String(r.id) === String(id)) || null;
+      });
+
+    const timed = Promise.race([
+      locked,
+      sleep(waitMs).then(() => ({ __lockWaitTimedOut: true })),
+    ]);
+
+    const out = await timed;
+    if (out && out.__lockWaitTimedOut) {
+      locked.catch(() => undefined);
+      const doc = await this._readEntityBestEffortNoLock(entity);
       return doc.records.find((r) => String(r.id) === String(id)) || null;
-    });
+    }
+    return out;
   }
 
   async create(entity, record) {

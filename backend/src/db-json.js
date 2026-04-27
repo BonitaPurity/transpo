@@ -559,15 +559,63 @@ async function createSchedule({ id, hubId, destination, departureTime, status, p
 }
 
 async function getBuses(hubId) {
-  const all = await store.readAll('buses');
-  const approved = all.filter((b) => b.approved !== false);
-  return hubId ? approved.filter((b) => b.hubId === hubId) : approved;
+  const [all, hubs] = await Promise.all([store.readAll('buses'), store.readAll('hubs')]);
+  const hubsById = new Map(hubs.map((h) => [h.id, h]));
+  const approved = all.filter((b) => b.approved !== false && !b.deletedAt);
+  const filtered = hubId ? approved.filter((b) => b.hubId === hubId) : approved;
+  return filtered.map((b) => {
+    const lat = Number(b.gpsLat);
+    const lng = Number(b.gpsLng);
+    const needsHubGps = !Number.isFinite(lat) || !Number.isFinite(lng) || (lat === 0 && lng === 0);
+    if (!needsHubGps) return b;
+    const hub = hubsById.get(b.hubId);
+    const hubLat = Number(hub?.lat);
+    const hubLng = Number(hub?.lng);
+    if (!Number.isFinite(hubLat) || !Number.isFinite(hubLng)) return b;
+    return { ...b, gpsLat: hubLat, gpsLng: hubLng };
+  });
+}
+
+async function softDeleteBus(id, actor = {}) {
+  const existing = await store.readById('buses', id);
+  if (!existing) return null;
+  if (existing.deletedAt) return existing;
+  const deletedAt = nowIso();
+  const deletedBy = actor?.id || actor?.email || null;
+  const updated = await store.updateById('buses', id, (b) => ({
+    ...b,
+    approved: false,
+    status: 'Deleted',
+    deletedAt,
+    deletedBy,
+    updatedAt: nowIso(),
+  }));
+  await syncFleetHubFare();
+  return updated;
+}
+
+async function createAuditLog({ action, actor, entityType, entityId, details }) {
+  const payload = {
+    action,
+    actor: actor || null,
+    entityType,
+    entityId,
+    details: details || null,
+    at: nowIso(),
+  };
+  await store.create('system_alerts', {
+    id: normalizeIdPrefix('aud'),
+    severity: 'audit',
+    message: JSON.stringify(payload),
+    isRead: true,
+    createdAt: payload.at,
+  });
 }
 
 async function listBusFares() {
   const [buses, fares] = await Promise.all([store.readAll('buses'), store.readAll('bus_fares')]);
   return buses
-    .filter((b) => b.approved !== false)
+    .filter((b) => b.approved !== false && !b.deletedAt)
     .map((b) => {
       const fee = fares.find((f) => f.busId === b.id);
       return { busId: b.id, busTag: b.tag, hubId: b.hubId, destination: b.destination, fareAmount: fee ? Number(fee.fareAmount) : null };
@@ -904,7 +952,7 @@ async function createUserDeliveryRequest({ userId, departureId, senderName, send
   if (!departure) return { error: 'Departure not found' };
   const bus = await getBusById(departure.busId);
   if (!bus || bus.approved === false) return { error: 'Bus is not approved for deliveries' };
-  const fee = (await getDeliveryFeeByBus(bus.id)) ?? 5000;
+  const fee = (await getDeliveryFeeByBus(bus.id)) ?? 10000;
   const schedule = await getScheduleById(departure.scheduleId);
   const delivery = await createDelivery({
     id: normalizeIdPrefix('del'),
@@ -1059,11 +1107,34 @@ async function updateBusStatus(id, status, battery = null) {
 }
 
 async function getBusById(id) {
-  return store.readById('buses', id);
+  const bus = await store.readById('buses', id);
+  if (!bus) return null;
+  const lat = Number(bus.gpsLat);
+  const lng = Number(bus.gpsLng);
+  const needsHubGps = !Number.isFinite(lat) || !Number.isFinite(lng) || (lat === 0 && lng === 0);
+  if (!needsHubGps) return bus;
+  const hub = await store.readById('hubs', bus.hubId);
+  const hubLat = Number(hub?.lat);
+  const hubLng = Number(hub?.lng);
+  if (!Number.isFinite(hubLat) || !Number.isFinite(hubLng)) return bus;
+  return { ...bus, gpsLat: hubLat, gpsLng: hubLng };
 }
 
 async function createBus({ id, tag, hubId, destination, status, speed, battery, gpsLat, gpsLng, seatCapacity, approved }) {
   if (!tag || !hubId) throw new Error('Missing required fields');
+  const initialLat = Number(gpsLat);
+  const initialLng = Number(gpsLng);
+  let finalLat = Number.isFinite(initialLat) ? initialLat : 0;
+  let finalLng = Number.isFinite(initialLng) ? initialLng : 0;
+  if (finalLat === 0 && finalLng === 0) {
+    const hub = await store.readById('hubs', hubId);
+    const hubLat = Number(hub?.lat);
+    const hubLng = Number(hub?.lng);
+    if (Number.isFinite(hubLat) && Number.isFinite(hubLng)) {
+      finalLat = hubLat;
+      finalLng = hubLng;
+    }
+  }
   const record = {
     id: id || normalizeIdPrefix('bus'),
     tag,
@@ -1072,11 +1143,13 @@ async function createBus({ id, tag, hubId, destination, status, speed, battery, 
     status: status || 'Active',
     speed: Math.max(0, asInt(speed, 0)),
     battery: Math.max(0, asInt(battery, 0)),
-    gpsLat: Number(gpsLat || 0),
-    gpsLng: Number(gpsLng || 0),
+    gpsLat: finalLat,
+    gpsLng: finalLng,
     lastSeen: nowIso(),
     seatCapacity: Math.max(1, asInt(seatCapacity, 45)),
     approved: approved === undefined || approved === null ? true : Boolean(approved),
+    deletedAt: null,
+    deletedBy: null,
     createdAt: nowIso(),
     updatedAt: nowIso(),
   };
@@ -1087,6 +1160,9 @@ async function createBus({ id, tag, hubId, destination, status, speed, battery, 
 
 async function updateBus(id, updates) {
   if (!updates || Object.keys(updates).length === 0) return getBusById(id);
+  const existing = await store.readById('buses', id);
+  if (!existing) return null;
+  if (existing.deletedAt) return null;
   const updated = await store.updateById('buses', id, (b) => ({ ...b, ...updates, updatedAt: nowIso() }));
   await syncFleetHubFare(); // Re-sync in case hub/approval changed
   return updated;
@@ -1242,31 +1318,43 @@ async function updateBookingStatus(id, status) {
 
 async function getReportingMetrics() {
   const today = todayLocalYmd();
-  const [bookings, schedules, challenges] = await Promise.all([
+  const [bookings, schedules, challenges, deliveries] = await Promise.all([
     store.readAll('bookings'),
     store.readAll('schedules'),
     store.readAll('challenges'),
+    store.readAll('deliveries'),
   ]);
   const todayBookings = bookings.filter((b) => String(b.createdAt || '').slice(0, 10) === today).length;
   const todayRevenue = bookings
     .filter((b) => b.paymentStatus === 'Completed' && String(b.createdAt || '').slice(0, 10) === today)
     .reduce((sum, b) => sum + asNumber(b.totalAmount, 0), 0);
+  const todayDeliveryRevenue = deliveries
+    .filter((d) => d.paymentStatus === 'Completed' && String(d.createdAt || '').slice(0, 10) === today)
+    .reduce((sum, d) => sum + asNumber(d.feeAmount, 0), 0);
+  const totalDeliveryRevenue = deliveries
+    .filter((d) => d.paymentStatus === 'Completed')
+    .reduce((sum, d) => sum + asNumber(d.feeAmount, 0), 0);
   const onTime = schedules.filter((s) => s.status === 'On Time').length;
   const onTimeRate = schedules.length > 0 ? Math.round((onTime / schedules.length) * 100) : 100;
-  return { todayBookings, todayRevenue, onTimeRate: `${onTimeRate}%`, challenges };
+  return { todayBookings, todayRevenue, todayDeliveryRevenue, totalDeliveryRevenue, onTimeRate: `${onTimeRate}%`, challenges };
 }
 
 async function getStats() {
-  const [buses, bookings, schedules] = await Promise.all([
+  const [buses, bookings, schedules, deliveries] = await Promise.all([
     store.readAll('buses'),
     store.readAll('bookings'),
     store.readAll('schedules'),
+    store.readAll('deliveries'),
   ]);
+  const totalDeliveryRevenue = deliveries
+    .filter((d) => d.paymentStatus === 'Completed')
+    .reduce((sum, d) => sum + asNumber(d.feeAmount, 0), 0);
   return {
     totalBuses: buses.length,
     totalBookings: bookings.length,
     totalRevenue: bookings.reduce((sum, b) => sum + asNumber(b.totalAmount, 0), 0),
     activeSchedules: schedules.filter((s) => s.status === 'On Time').length,
+    totalDeliveryRevenue,
   };
 }
 
@@ -1304,6 +1392,27 @@ async function logTelemetry(busId, { battery, speed, gpsLat, gpsLng }) {
 
 async function getChallenges() {
   return store.readAll('challenges');
+}
+
+async function upsertChallenge({ id, severity, title, detail, metric, solution, impact, status, scenarioGenerated }) {
+  return store.upsert(
+    'challenges',
+    (r) => r.id === id,
+    (existing) => ({
+      ...(existing || {}),
+      id, severity, title, detail, metric, solution, impact,
+      status: status || 'action_required',
+      scenarioGenerated: scenarioGenerated || false,
+      updatedAt: nowIso(),
+      createdAt: existing?.createdAt || nowIso(),
+    })
+  );
+}
+
+async function clearScenarioChallenges() {
+  const all = await store.readAll('challenges');
+  const filtered = all.filter(r => !r.scenarioGenerated);
+  return store.replaceAll('challenges', filtered);
 }
 
 async function getPricingRoutes() {
@@ -1345,6 +1454,8 @@ module.exports = {
   initDb,
   getDbMode,
   getChallenges,
+  upsertChallenge,
+  clearScenarioChallenges,
   getPricingRoutes,
   updatePricingRoute,
   findUserByEmail,
@@ -1362,6 +1473,8 @@ module.exports = {
   getBuses,
   listBusFares,
   upsertBusFare,
+  softDeleteBus,
+  createAuditLog,
   getBusFare,
   getBusByTag,
   getDeparturesBetween,

@@ -48,6 +48,7 @@ describe(testDbUrl ? 'Backend auth API' : 'Backend auth API (skipped: no TEST_DA
     expect(response.status).toBe(201);
     expect(response.body.success).toBe(true);
     expect(response.body.data).toHaveProperty('token');
+    expect(response.body.data).toHaveProperty('refreshToken');
     expect(response.body.data.user).toMatchObject({ email, role: 'user' });
   });
 
@@ -69,6 +70,7 @@ describe(testDbUrl ? 'Backend auth API' : 'Backend auth API (skipped: no TEST_DA
     expect(loginResponse.status).toBe(200);
     expect(loginResponse.body.success).toBe(true);
     expect(loginResponse.body.data).toHaveProperty('token');
+    expect(loginResponse.body.data).toHaveProperty('refreshToken');
     expect(loginResponse.body.data.user).toMatchObject({ email });
 
     const token = loginResponse.body.data.token;
@@ -78,6 +80,46 @@ describe(testDbUrl ? 'Backend auth API' : 'Backend auth API (skipped: no TEST_DA
 
     expect(meResponse.status).toBe(200);
     expect(meResponse.body.data).toMatchObject({ email, role: 'user' });
+  });
+
+  it('refreshes access token and rotates refresh token', async () => {
+    const email = `refresh.user.${Date.now()}@example.com`;
+    await request(app)
+      .post('/api/auth/register')
+      .send({
+        name: 'Refresh User',
+        email,
+        phone: '+256700000009',
+        password: 'RefreshPass123!'
+      });
+
+    const loginResponse = await request(app)
+      .post('/api/auth/login')
+      .send({ email, password: 'RefreshPass123!' });
+
+    const firstRefresh = loginResponse.body?.data?.refreshToken;
+    expect(firstRefresh).toBeTruthy();
+
+    const refreshResponse = await request(app)
+      .post('/api/auth/refresh')
+      .send({ refreshToken: firstRefresh });
+
+    expect(refreshResponse.status).toBe(200);
+    expect(refreshResponse.body.success).toBe(true);
+    expect(refreshResponse.body.data).toHaveProperty('token');
+    expect(refreshResponse.body.data).toHaveProperty('refreshToken');
+    expect(refreshResponse.body.data.refreshToken).not.toBe(firstRefresh);
+
+    const meResponse = await request(app)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${refreshResponse.body.data.token}`);
+    expect(meResponse.status).toBe(200);
+    expect(meResponse.body.data).toMatchObject({ email, role: 'user' });
+
+    const oldRefreshRetry = await request(app)
+      .post('/api/auth/refresh')
+      .send({ refreshToken: firstRefresh });
+    expect(oldRefreshRetry.status).toBe(401);
   });
 });
 

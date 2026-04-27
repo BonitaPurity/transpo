@@ -86,20 +86,17 @@ export default function Bookings() {
       {/* Boarding Pass Ticket Modal */}
       <AnimatePresence>
         {showTicket && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/90 backdrop-blur-xl">
+          <div
+            className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/90 backdrop-blur-xl"
+            onClick={() => setShowTicket(null)}
+          >
             <motion.div 
               initial={{ y: 100, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: 100, opacity: 0 }}
               className="w-full max-w-sm bg-yellow-400 rounded-[48px] p-1 border-8 border-black shadow-2xl relative"
+              onClick={(e) => e.stopPropagation()}
             >
-              <button 
-                onClick={() => setShowTicket(null)}
-                className="absolute -top-12 right-0 text-white/40 hover:text-white transition-colors"
-              >
-                <X className="w-10 h-10" />
-              </button>
-
               <div className="bg-white rounded-[40px] overflow-hidden flex flex-col">
                 <div className="bg-black text-yellow-400 p-8 flex justify-between items-center">
                   <div className="space-y-1">
@@ -141,11 +138,19 @@ export default function Bookings() {
                   </div>
                 </div>
 
-                <div className="bg-zinc-50 p-6 flex items-center justify-center gap-4 border-t-4 border-black/5">
-                   <div className="w-8 h-8 bg-black rounded-lg flex items-center justify-center">
-                      <ShieldCheck className="w-4 h-4 text-yellow-400" />
+                <div className="bg-zinc-50 p-6 flex items-center justify-between gap-4 border-t-4 border-black/5">
+                   <div className="flex items-center gap-3">
+                     <div className="w-8 h-8 bg-black rounded-lg flex items-center justify-center shrink-0">
+                        <ShieldCheck className="w-4 h-4 text-yellow-400" />
+                     </div>
+                     <div className="text-[10px] font-black uppercase tracking-tighter">Verified Digital Asset</div>
                    </div>
-                   <div className="text-[10px] font-black uppercase tracking-tighter">Verified Digital Asset</div>
+                   <button
+                     onClick={() => setShowTicket(null)}
+                     className="flex items-center gap-2 px-5 py-3 bg-black text-white font-black uppercase text-xs tracking-widest rounded-2xl hover:bg-zinc-800 transition-colors border-2 border-black shrink-0"
+                   >
+                     <X className="w-4 h-4" /> Close
+                   </button>
                 </div>
               </div>
             </motion.div>
@@ -163,10 +168,10 @@ export default function Bookings() {
           <p className="text-zinc-500 font-bold ml-1">Personal transit logs and issued boarding passes.</p>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-3">
           <div className="bg-zinc-100 border-4 border-black p-3 rounded-2xl flex items-center gap-3 px-6">
-            <Search className="w-5 h-5 text-zinc-400" />
-            <input type="text" placeholder="Search pass ID..." className="bg-transparent font-bold outline-none uppercase text-xs w-40" />
+            <Search className="w-5 h-5 text-zinc-400 shrink-0" />
+            <input type="text" placeholder="Search pass ID..." className="bg-transparent font-bold outline-none uppercase text-xs w-32" />
           </div>
           <button
             onClick={async () => {
@@ -179,7 +184,7 @@ export default function Bookings() {
               }
             }}
             disabled={!user?.id || !!exporting}
-            className="px-6 py-4 bg-yellow-400 border-4 border-black rounded-2xl shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] font-black uppercase tracking-widest text-xs hover:translate-x-1 hover:translate-y-1 hover:shadow-none transition-all disabled:opacity-60"
+            className="px-5 py-4 bg-yellow-400 border-4 border-black rounded-2xl shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] font-black uppercase tracking-widest text-xs hover:translate-x-1 hover:translate-y-1 hover:shadow-none transition-all disabled:opacity-60 whitespace-nowrap"
           >
             {exporting === 'csv' ? 'Downloading…' : 'Download CSV'}
           </button>
@@ -194,7 +199,7 @@ export default function Bookings() {
               }
             }}
             disabled={!user?.id || !!exporting}
-            className="px-6 py-4 bg-black text-yellow-400 border-4 border-black rounded-2xl shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] font-black uppercase tracking-widest text-xs hover:translate-x-1 hover:translate-y-1 hover:shadow-none transition-all disabled:opacity-60"
+            className="px-5 py-4 bg-black text-yellow-400 border-4 border-black rounded-2xl shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] font-black uppercase tracking-widest text-xs hover:translate-x-1 hover:translate-y-1 hover:shadow-none transition-all disabled:opacity-60 whitespace-nowrap"
           >
             {exporting === 'pdf' ? 'Downloading…' : 'Download PDF'}
           </button>
@@ -226,58 +231,57 @@ export default function Bookings() {
                    initial={{ opacity: 0, x: -20 }}
                    animate={{ opacity: 1, x: 0 }}
                    transition={{ delay: index * 0.1 }}
-
                    className="card-premium group"
                 >
-                   <div className="flex flex-col md:flex-row items-center gap-10">
-                      <div className="w-24 h-24 bg-yellow-400 border-4 border-black rounded-3xl flex flex-col items-center justify-center rotate-2 shadow-lg group-hover:rotate-0 transition-transform">
-                         <div className="text-[10px] font-black uppercase opacity-60">ID</div>
-                         <div className="text-xl font-black">{booking.id}</div>
+                   <div className="flex flex-col lg:flex-row items-start lg:items-center gap-6">
+                      <div className="w-20 h-20 shrink-0 bg-yellow-400 border-4 border-black rounded-3xl flex flex-col items-center justify-center rotate-2 shadow-lg group-hover:rotate-0 transition-transform">
+                         <div className="text-[9px] font-black uppercase opacity-60">ID</div>
+                         <div className="text-sm font-black leading-tight text-center px-1 break-all">{booking.id}</div>
                       </div>
                       
-                      <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-8 w-full">
-                         <div>
+                      <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 w-full min-w-0">
+                         <div className="min-w-0">
                             <span className="label-small">Traveler</span>
-                            <div className="font-black text-black uppercase">{booking.passengerName}</div>
+                            <div className="font-black text-black uppercase truncate">{booking.passengerName}</div>
                          </div>
-                         <div>
+                         <div className="min-w-0">
                             <span className="label-small">Route</span>
-                            <div className="font-black text-black uppercase tracking-tight">Kampala ➔ {booking.destination}</div>
+                            <div className="font-black text-black uppercase tracking-tight truncate">Kampala ➔ {booking.destination}</div>
                          </div>
-                         <div>
+                         <div className="min-w-0">
                             <span className="label-small">Schedule</span>
-                            <div className="font-black text-black uppercase">{booking.travelDate} at {booking.departureTime}</div>
+                            <div className="font-black text-black uppercase truncate">{booking.travelDate}</div>
+                            <div className="font-black text-black uppercase text-sm truncate">at {booking.departureTime}</div>
                          </div>
-                         <div>
+                         <div className="min-w-0">
                             <span className="label-small">Status</span>
                             <div className={`font-black uppercase text-xs flex items-center gap-2 ${booking.paymentStatus === 'Completed' ? 'text-green-600' : 'text-amber-500'}`}>
-                               <div className="w-2 h-2 bg-current rounded-full" /> {booking.paymentStatus}
+                               <div className="w-2 h-2 bg-current rounded-full shrink-0" /> {booking.paymentStatus}
                             </div>
                          </div>
                       </div>
 
-                      <div className="flex items-center gap-4">
+                      <div className="flex flex-wrap items-center gap-3 shrink-0">
                          {booking.paymentStatus === 'Completed' && (
                            <button 
                              onClick={() => handleShare(booking)}
-                             className="px-6 py-3 bg-zinc-100 text-black font-black rounded-xl text-[10px] uppercase border-2 border-black tracking-widest hover:scale-105 transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:shadow-none flex items-center gap-2"
+                             className="px-4 py-3 bg-zinc-100 text-black font-black rounded-xl text-[10px] uppercase border-2 border-black tracking-widest hover:scale-105 transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:shadow-none flex items-center gap-2 whitespace-nowrap"
                            >
                              <Share className="w-4 h-4" /> Forward
                            </button>
                          )}
                           <Link 
                               href="/monitoring"
-                              className="px-6 py-3 bg-yellow-400 text-black font-black rounded-xl text-[10px] uppercase border-2 border-black tracking-widest hover:scale-105 transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:shadow-none flex items-center gap-2"
+                              className="px-4 py-3 bg-yellow-400 text-black font-black rounded-xl text-[10px] uppercase border-2 border-black tracking-widest hover:scale-105 transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:shadow-none flex items-center gap-2 whitespace-nowrap"
                             >
                               <Navigation className="w-4 h-4" /> Track Live
                           </Link>
                           <button 
                              onClick={() => handleShowTicket(booking.id)}
-                             className="px-8 py-3 bg-black text-yellow-400 font-black rounded-xl text-[10px] uppercase border-2 border-white tracking-widest hover:bg-zinc-800 transition-colors"
+                             className="px-6 py-3 bg-black text-yellow-400 font-black rounded-xl text-[10px] uppercase border-2 border-white tracking-widest hover:bg-zinc-800 transition-colors whitespace-nowrap"
                            >
                              Show Ticket
                            </button>
-
                       </div>
                    </div>
                 </motion.div>

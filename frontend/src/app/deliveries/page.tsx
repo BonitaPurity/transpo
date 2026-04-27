@@ -69,7 +69,7 @@ export default function DeliveriesPage() {
   const [selectedDate, setSelectedDate] = useState<string>(localDateKey(new Date()));
   const [departures, setDepartures] = useState<DepartureOption[]>([]);
   const [departureId, setDepartureId] = useState('');
-  const [quoteFee, setQuoteFee] = useState<number | null>(null);
+  const [quoteFee, setQuoteFee] = useState<number>(10000);
 
   const [receiverName, setReceiverName] = useState('');
   const [receiverPhone, setReceiverPhone] = useState('');
@@ -80,6 +80,7 @@ export default function DeliveriesPage() {
   const [provider, setProvider] = useState<'MTN' | 'Airtel'>('MTN');
   const [createdDeliveryId, setCreatedDeliveryId] = useState<string | null>(null);
   const [trackingCode, setTrackingCode] = useState<string | null>(null);
+  const [paymentDone, setPaymentDone] = useState(false);
   const [myDeliveries, setMyDeliveries] = useState<Delivery[]>([]);
 
   const printTrackingLabel = (tc: string) => {
@@ -184,14 +185,14 @@ export default function DeliveriesPage() {
   useEffect(() => {
     async function loadQuote() {
       if (!user || !departureId) {
-        setQuoteFee(null);
+        setQuoteFee(10000);
         return;
       }
       try {
         const res = await apiService.getDeliveryQuote(departureId);
-        if (res?.success) setQuoteFee(Number(res.data?.feeAmount ?? 0));
+        if (res?.success) setQuoteFee(Number(res.data?.feeAmount ?? 10000));
       } catch {
-        setQuoteFee(null);
+        setQuoteFee(10000);
       }
     }
     loadQuote();
@@ -242,7 +243,8 @@ export default function DeliveriesPage() {
       const tc = res.data?.trackingCode || null;
       setTrackingCode(tc);
       if (tc) setCode(tc);
-      setQuoteFee(Number(res.data.feeAmount ?? quoteFee ?? 0));
+      setQuoteFee(Number(res.data.feeAmount ?? quoteFee ?? 10000));
+      setPaymentDone(false);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Failed to create delivery');
     } finally {
@@ -268,6 +270,7 @@ export default function DeliveriesPage() {
       const tc = res.trackingCode || res.data?.trackingCode || null;
       setTrackingCode(tc);
       if (tc) setCode(tc);
+      setPaymentDone(true);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Payment failed');
     } finally {
@@ -411,58 +414,118 @@ export default function DeliveriesPage() {
             </div>
 
             <div className="bg-zinc-50 border-2 border-black rounded-2xl p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-              <div className="font-black">
-                Delivery fee: UGX {Number(quoteFee ?? 0).toLocaleString()}
+              <div>
+                <div className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-1">Delivery Fee</div>
+                <div className="font-black text-xl">UGX {Number(quoteFee).toLocaleString()}</div>
+                <div className="text-xs font-bold text-zinc-500 mt-0.5">Fee is charged per parcel. Payment required after booking.</div>
               </div>
               <button
                 onClick={submitDelivery}
                 disabled={loading}
                 className="px-8 py-4 rounded-2xl bg-black text-yellow-400 border-4 border-black font-black uppercase tracking-widest text-xs disabled:opacity-60"
               >
-                Create Delivery
+                {loading ? 'Creating...' : 'Create Delivery'}
               </button>
             </div>
 
             {createdDeliveryId && (
-              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-black text-yellow-400 border-4 border-black rounded-[32px] p-6 space-y-4">
-                <div className="text-[10px] font-black uppercase tracking-widest opacity-70">Payment</div>
-                <div className="text-xl font-black uppercase tracking-tighter flex items-center gap-2">
-                  <Wallet className="w-5 h-5" /> Pay UGX {Number(quoteFee ?? 0).toLocaleString()}
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+
+                {/* Step indicator */}
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-full bg-green-500 text-white flex items-center justify-center font-black text-xs">✓</div>
+                    <span className="text-xs font-black uppercase tracking-widest text-green-600">Delivery Created</span>
+                  </div>
+                  <div className="flex-1 h-0.5 bg-black/20" />
+                  <div className="flex items-center gap-2">
+                    <div className={`w-7 h-7 rounded-full flex items-center justify-center font-black text-xs border-4 border-black ${paymentDone ? 'bg-green-500 text-white' : 'bg-yellow-400 text-black'}`}>
+                      {paymentDone ? '✓' : '2'}
+                    </div>
+                    <span className={`text-xs font-black uppercase tracking-widest ${paymentDone ? 'text-green-600' : 'text-black'}`}>
+                      {paymentDone ? 'Payment Confirmed' : 'Pay Now'}
+                    </span>
+                  </div>
+                  <div className="flex-1 h-0.5 bg-black/20" />
+                  <div className="flex items-center gap-2">
+                    <div className={`w-7 h-7 rounded-full flex items-center justify-center font-black text-xs border-4 border-black ${paymentDone ? 'bg-green-500 text-white' : 'bg-zinc-200 text-zinc-400'}`}>
+                      {paymentDone ? '✓' : '3'}
+                    </div>
+                    <span className={`text-xs font-black uppercase tracking-widest ${paymentDone ? 'text-green-600' : 'text-zinc-400'}`}>Print Label</span>
+                  </div>
                 </div>
+
+                {/* Tracking code — always visible after creation */}
                 {trackingCode && (
-                  <div className="bg-white text-black border-4 border-black rounded-2xl p-4 font-black flex items-center justify-between gap-3 flex-wrap">
-                    <div>Tracking code: {trackingCode}</div>
-                    <button
-                      onClick={() => printTrackingLabel(trackingCode)}
-                      className="px-5 py-3 rounded-2xl bg-yellow-400 text-black border-4 border-black font-black uppercase tracking-widest text-xs"
-                    >
-                      Print Label
-                    </button>
+                  <div className="bg-zinc-50 border-4 border-black rounded-2xl p-4 flex items-center justify-between gap-3 flex-wrap">
+                    <div>
+                      <div className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-1">Tracking Code</div>
+                      <div className="font-black text-xl tracking-widest">{trackingCode}</div>
+                    </div>
+                    {/* Print only available after payment */}
+                    {paymentDone ? (
+                      <button
+                        onClick={() => printTrackingLabel(trackingCode)}
+                        className="px-5 py-3 rounded-2xl bg-yellow-400 text-black border-4 border-black font-black uppercase tracking-widest text-xs flex items-center gap-2"
+                      >
+                        🖨 Print Label
+                      </button>
+                    ) : (
+                      <div className="px-5 py-3 rounded-2xl bg-zinc-100 text-zinc-400 border-4 border-zinc-200 font-black uppercase tracking-widest text-xs cursor-not-allowed">
+                        Print (pay first)
+                      </div>
+                    )}
                   </div>
                 )}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <select
-                    value={provider}
-                    onChange={(e) => setProvider(e.target.value === 'Airtel' ? 'Airtel' : 'MTN')}
-                    className="px-5 py-4 rounded-2xl border-4 border-yellow-400 bg-black text-yellow-400 font-black"
-                  >
-                    <option value="MTN">MTN</option>
-                    <option value="Airtel">Airtel</option>
-                  </select>
-                  <input
-                    value={paymentPhone}
-                    onChange={(e) => setPaymentPhone(e.target.value)}
-                    placeholder="Payment phone number"
-                    className="md:col-span-2 px-5 py-4 rounded-2xl border-4 border-yellow-400 bg-black text-yellow-400 font-black"
-                  />
-                </div>
-                <button
-                  onClick={payNow}
-                  disabled={loading}
-                  className="w-full px-8 py-4 rounded-2xl bg-yellow-400 text-black border-4 border-black font-black uppercase tracking-widest text-xs disabled:opacity-60"
-                >
-                  Pay Now and Get Tracking Code
-                </button>
+
+                {/* Payment form — hidden after payment done */}
+                {!paymentDone ? (
+                  <div className="bg-black text-yellow-400 border-4 border-black rounded-[32px] p-6 space-y-4">
+                    <div className="text-[10px] font-black uppercase tracking-widest opacity-70">Step 2 — Pay Delivery Fee</div>
+                    <div className="text-xl font-black uppercase tracking-tighter flex items-center gap-2">
+                      <Wallet className="w-5 h-5" /> UGX {Number(quoteFee).toLocaleString()} via Mobile Money
+                    </div>
+                    <div className="text-xs font-bold opacity-60 leading-relaxed">
+                      Select your network, enter the phone number to charge, then tap Pay Now. You will receive a prompt on your phone to confirm.
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <select
+                        value={provider}
+                        onChange={(e) => setProvider(e.target.value === 'Airtel' ? 'Airtel' : 'MTN')}
+                        className="px-5 py-4 rounded-2xl border-4 border-yellow-400 bg-black text-yellow-400 font-black"
+                      >
+                        <option value="MTN">MTN Mobile Money</option>
+                        <option value="Airtel">Airtel Money</option>
+                      </select>
+                      <input
+                        value={paymentPhone}
+                        onChange={(e) => setPaymentPhone(e.target.value)}
+                        placeholder="e.g. 0771234567"
+                        className="md:col-span-2 px-5 py-4 rounded-2xl border-4 border-yellow-400 bg-black text-yellow-400 font-black placeholder:opacity-40"
+                      />
+                    </div>
+                    <button
+                      onClick={payNow}
+                      disabled={loading || !paymentPhone.trim()}
+                      className="w-full px-8 py-4 rounded-2xl bg-yellow-400 text-black border-4 border-black font-black uppercase tracking-widest text-xs disabled:opacity-60 flex items-center justify-center gap-2"
+                    >
+                      {loading ? (
+                        <><div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" /> Processing...</>
+                      ) : (
+                        <><Wallet className="w-4 h-4" /> Pay UGX {Number(quoteFee).toLocaleString()} Now</>
+                      )}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="bg-green-50 border-4 border-green-500 rounded-[32px] p-6 space-y-2">
+                    <div className="text-green-700 font-black uppercase tracking-widest text-sm flex items-center gap-2">
+                      ✓ Payment Confirmed — UGX {Number(quoteFee).toLocaleString()}
+                    </div>
+                    <div className="text-green-600 font-bold text-sm">
+                      Your delivery is now active. Print the label above and attach it to your parcel before dispatch.
+                    </div>
+                  </div>
+                )}
               </motion.div>
             )}
           </div>
@@ -498,11 +561,27 @@ export default function DeliveriesPage() {
                   <div className="font-black uppercase tracking-tighter">
                     {d.destination || 'Delivery'} · {d.travelDate || '—'}
                   </div>
-                  <div className="font-black">
-                    {d.paymentStatus === 'Completed' ? d.trackingCode : 'Pending payment'}
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <span className={`text-xs font-black uppercase px-3 py-1 rounded-full border-2 ${
+                      d.paymentStatus === 'Completed' ? 'bg-green-100 text-green-700 border-green-400' : 'bg-amber-100 text-amber-700 border-amber-400'
+                    }`}>
+                      {d.paymentStatus === 'Completed' ? '✓ Paid' : 'Pending Payment'}
+                    </span>
+                    {d.paymentStatus === 'Completed' && d.trackingCode && (
+                      <button
+                        onClick={() => printTrackingLabel(d.trackingCode)}
+                        className="px-4 py-2 rounded-xl bg-yellow-400 text-black border-2 border-black font-black uppercase tracking-widest text-xs"
+                      >
+                        🖨 Print
+                      </button>
+                    )}
                   </div>
                 </div>
-                {d.description && <div className="font-bold text-zinc-700 text-sm mt-2">{d.description}</div>}
+                <div className="font-black text-sm mt-1 text-zinc-500">{d.trackingCode}</div>
+                {d.description && <div className="font-bold text-zinc-700 text-sm mt-1">{d.description}</div>}
+                {d.status && (
+                  <div className="text-xs font-bold text-zinc-500 mt-1 uppercase">Status: {d.status}</div>
+                )}
               </div>
             ))}
           </div>

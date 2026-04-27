@@ -67,6 +67,17 @@ interface Departure {
   isSoldOut: boolean;
   scheduleStatus?: string;
 }
+ 
+interface Arrival {
+  id: string;
+  hubId: string;
+  travelDate: string;
+  departureTime: string;
+  destination: string;
+  status: string;
+  expectedArrivalAt?: string | null;
+  busTag?: string | null;
+}
 
 type BookingSchedule = Schedule & {
   departureId: string;
@@ -82,6 +93,7 @@ export default function Dashboard() {
   const [hubs, setHubs] = useState<Hub[]>([]);
   const [selectedHub, setSelectedHub] = useState<Hub | null>(null);
   const [departures, setDepartures] = useState<Departure[]>([]);
+  const [arrivals, setArrivals] = useState<Arrival[]>([]);
   const [userBookings, setUserBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(false);
   const [apiError, setApiError] = useState<string>('');
@@ -120,8 +132,10 @@ export default function Dashboard() {
       try {
         const hubsRes = await apiService.getHubs();
         if (hubsRes.success) setHubs(hubsRes.data || []);
-        const depRes = await apiService.getDepartures({ startDate: selectedDate });
+        const depRes = await apiService.getDepartures({ startDate: selectedDate, includePast: true });
         if (depRes.success) setDepartures(depRes.data || []);
+        const arrRes = await apiService.getArrivals({ startDate: selectedDate });
+        if (arrRes.success) setArrivals(arrRes.data || []);
         if (hubsRes.success && depRes.success) setApiError('');
       } catch {
         setApiError('Backend unavailable. Active departures will appear after the admin adds live data.');
@@ -135,8 +149,10 @@ export default function Dashboard() {
   useEffect(() => {
     const interval = setInterval(async () => {
       try {
-        const res = await apiService.getDepartures({ hubId: selectedHub?.id, startDate: selectedDate });
-        if (res?.success) setDepartures(res.data || []);
+        const depRes = await apiService.getDepartures({ hubId: selectedHub?.id, startDate: selectedDate, includePast: true });
+        if (depRes?.success) setDepartures(depRes.data || []);
+        const arrRes = await apiService.getArrivals({ hubId: selectedHub?.id, startDate: selectedDate });
+        if (arrRes?.success) setArrivals(arrRes.data || []);
       } catch {
       }
     }, 8000);
@@ -149,7 +165,7 @@ export default function Dashboard() {
     setSelectedHub(hub);
     setLoading(true);
     try {
-      const res = await apiService.getDepartures({ hubId: hub?.id, startDate: selectedDate });
+      const res = await apiService.getDepartures({ hubId: hub?.id, startDate: selectedDate, includePast: true });
       if (res.success) {
         setDepartures(res.data || []);
         setApiError('');
@@ -542,55 +558,49 @@ export default function Dashboard() {
                   );
                 })}
            </div>
-        </div>
-
-        {/* Sidebar Mini-Module: My Trip */}
-        <div className="space-y-8">
-           <h3 className="text-2xl font-black text-black uppercase italic tracking-tighter border-b-4 border-black pb-2">User Context</h3>
-           
-           {user ? (
-             <div className="card-premium bg-yellow-400">
-                <div className="flex items-center justify-between mb-8">
-                   <div className="text-[10px] font-black uppercase border-b-2 border-black inline-block">Active Trip Card</div>
-                   <Star className="w-5 h-5 fill-black" />
-                </div>
-                
-                <div className="py-10 text-center border-4 border-dashed border-black/20 rounded-2xl mb-6">
-                   <MapPin className="w-12 h-12 mx-auto mb-4 text-black/20" />
-                   <p className="text-xs font-black uppercase text-black/40 px-6 leading-relaxed">No upcoming tickets issued to {user.name.split(' ')[0]}. Select a departure to get started.</p>
-                </div>
-
-                <div className="space-y-4">
-                   <div className="flex justify-between text-[10px] font-bold uppercase opacity-60">
-                      <span>Sync Status</span>
-                      <span className="text-green-700">Online</span>
-                   </div>
-                   <div className="w-full h-2 bg-black/10 rounded-full overflow-hidden">
-                      <div className="w-full h-full bg-black animate-pulse" />
-                   </div>
-                </div>
-             </div>
-           ) : (
-             <Link href="/login" className="card-premium bg-zinc-100 border-dashed hover:border-solid block group">
-                <div className="py-12 text-center space-y-4">
-                   <User className="w-12 h-12 mx-auto text-zinc-300 group-hover:text-black transition-colors" />
-                   <div className="font-black uppercase tracking-widest text-zinc-400 group-hover:text-black transition-colors">Sign In to Personalize</div>
-                   <p className="text-[10px] font-bold text-zinc-300 px-8">Authenticated users get priority tracking and express booking features.</p>
-                </div>
-             </Link>
-           )}
-
-           <div className="bg-black text-white p-8 rounded-[32px] border-4 border-yellow-400 shadow-xl">
-              <h4 className="text-lg font-black uppercase mb-4 text-yellow-400 underline decoration-2">Arrivals Advisory</h4>
-              <div className="space-y-4">
-                 {[1,2].map(i => (
-                    <div key={i} className="flex justify-between items-center py-2 border-b border-white/10">
-                       <span className="font-bold text-sm">#B-99{i} from Masaka</span>
-                       <span className="text-[10px] font-black bg-yellow-400 text-black px-2 py-1 rounded">EST 10:45</span>
-                    </div>
-                 ))}
-              </div>
            </div>
+
+        {/* Sidebar Mini-Module: Active Arrivals */}
+        <div className="space-y-8">
+           <h3 className="text-2xl font-black text-black uppercase italic tracking-tighter border-b-4 border-black pb-2">Active Arrivals</h3>
+           
+           <div className="space-y-4">
+              {arrivals.length === 0 ? (
+                <div className="card-premium bg-zinc-100 border-dashed">
+                   <div className="py-12 text-center space-y-4">
+                      <MapPin className="w-12 h-12 mx-auto text-zinc-300" />
+                      <div className="font-black uppercase tracking-widest text-zinc-400">No Incoming Units</div>
+                      <p className="text-[10px] font-bold text-zinc-300 px-8">Real-time arrival intelligence will appear when buses are en route.</p>
+                   </div>
+                </div>
+              ) : (
+                arrivals.map((arr) => (
+                  <motion.div 
+                    key={arr.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="bg-white border-4 border-black p-6 rounded-[32px] shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] space-y-3"
+                  >
+                     <div className="flex justify-between items-center">
+                        <span className="text-[10px] font-black uppercase px-2 py-1 bg-black text-yellow-400 rounded">
+                           {arr.busTag || 'BUS'}
+                        </span>
+                        <span className="text-[9px] font-black uppercase text-green-600 bg-green-50 px-2 py-1 rounded">
+                           {arr.status}
+                        </span>
+                     </div>
+                     <div className="text-xl font-black uppercase tracking-tighter">{arr.destination}</div>
+                     <div className="flex justify-between items-center text-[10px] font-bold text-zinc-500">
+                        <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {arr.departureTime}</span>
+                        {arr.expectedArrivalAt && (
+                          <span className="text-black">ETA: {new Date(arr.expectedArrivalAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        )}
+                     </div>
+                  </motion.div>
+                ))
+              )}
+           </div>
+
         </div>
       </div>
 

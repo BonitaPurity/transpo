@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { Bus, ArrowRight, ShieldCheck, ShieldAlert } from 'lucide-react';
@@ -11,8 +11,16 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const { login, adminLogin } = useAuth();
+  const { user, login, adminLogin, isAdmin, isLoading } = useAuth();
   const router = useRouter();
+
+  // Auto-redirect if already logged in
+  useEffect(() => {
+    if (!isLoading && user) {
+      if (isAdmin) router.replace('/admin');
+      else router.replace('/dashboard');
+    }
+  }, [user, isAdmin, isLoading, router]);
 
   const validateEmail = (email: string) => {
     return /^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/.test(email);
