@@ -99,9 +99,12 @@ Copy this — you need it for the frontend.
 2. Import your GitHub repo (`BonitaPurity/transpo` or `evnzhenry/BAP`)
 3. Set:
    - **Framework Preset**: `Next.js`
-   - **Root Directory**: `frontend`
-   - **Build Command**: `npm run build` (auto-detected)
-   - **Output Directory**: `.next` (auto-detected)
+   - **Root Directory**: `frontend` ← **important, must be set to `frontend`**
+   - **Build Command**: `npm run build`
+   - **Output Directory**: `.next`
+   - **Install Command**: `npm install`
+
+> The root-level `vercel.json` already sets `rootDirectory: "frontend"` so Vercel should auto-detect this. If it doesn't, set it manually in the UI.
 
 ### 3.2 Set Environment Variables
 
@@ -211,6 +214,12 @@ After first login, go to **Admin** → **Users** and change the default admin pa
 ---
 
 ## Troubleshooting
+
+### Vercel shows 404 Not Found
+- Ensure **Root Directory** is set to `frontend` in Vercel project settings
+- Go to Vercel → your project → **Settings** → **General** → **Root Directory** → set to `frontend`
+- Trigger a redeploy after changing the root directory
+- Ensure `BACKEND_URL` environment variable is set — without it the API proxy has no target
 
 ### Backend not starting on Render
 - Check Render logs for `JWT_SECRET must be set in production`

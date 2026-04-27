@@ -2,8 +2,6 @@ import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
-  output: 'standalone',
-  turbopack: {},
   async rewrites() {
     const backendUrl = process.env.BACKEND_URL || 'http://localhost:5000';
     return [
