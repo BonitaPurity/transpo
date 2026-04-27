@@ -529,6 +529,12 @@ export default function Dashboard() {
                         }`}>
                            <div className={`w-2 h-2 rounded-full ${dep.isSoldOut ? 'bg-red-600' : 'bg-green-600 animate-pulse'}`} /> {dep.isSoldOut ? 'Sold Out' : `${dep.seatsAvailable}/${dep.seatCapacity} Seats`}
                         </span>
+                        {/* Hub origin — matches admin panel hub names */}
+                        {!selectedHub && (
+                          <span className="text-[10px] font-black uppercase flex items-center gap-1 text-zinc-400 shrink-0">
+                            <MapPin className="w-3 h-3" /> {hubs.find(h => h.id === dep.hubId)?.name || dep.hubId}
+                          </span>
+                        )}
                       </div>
                       <div className="text-4xl font-black tracking-tighter flex items-center gap-4 flex-wrap overflow-hidden">
                         <span className="shrink-0">{dep.departureTime}</span>

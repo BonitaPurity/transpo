@@ -32,6 +32,7 @@ export default function AdminFleet() {
   const [hubs, setHubs] = useState<Hub[]>([]);
   const [selectedHub, setSelectedHub] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [isPolling, setIsPolling] = useState(false);
   const [error, setError] = useState('');
   const [knownDestinations, setKnownDestinations] = useState<string[]>([]);
   const [busyBusId, setBusyBusId] = useState<string | null>(null);
@@ -70,17 +71,19 @@ export default function AdminFleet() {
 
 
 
-  const loadFleet = useCallback(async () => {
-    setIsLoading(true);
+  const loadFleet = useCallback(async (silent = false) => {
+    if (!silent) setIsLoading(true);
+    else setIsPolling(true);
     try {
       const res = await apiService.getFleet(selectedHub || undefined);
       if (res?.success) {
         setFleet(res.data as Bus[]);
       }
     } catch {
-      setError('Unable to load fleet');
+      if (!silent) setError('Unable to load fleet');
     } finally {
-      setIsLoading(false);
+      if (!silent) setIsLoading(false);
+      else setIsPolling(false);
     }
   }, [selectedHub]);
 
@@ -129,7 +132,7 @@ export default function AdminFleet() {
 
   useEffect(() => {
     const interval = setInterval(() => {
-      loadFleet();
+      loadFleet(true); // silent poll — no loading spinner, no content flash
     }, 8000);
     return () => clearInterval(interval);
   }, [loadFleet]);
@@ -240,7 +243,10 @@ export default function AdminFleet() {
       <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-4xl font-black text-yellow-400 uppercase italic tracking-tighter">Fleet Manager</h2>
-          <p className="text-white/40 text-sm font-bold mt-1">Register buses, assign GPS, and track them in near real-time.</p>
+          <p className="text-white/40 text-sm font-bold mt-1">
+            Register buses, assign GPS, and track them in near real-time.
+            {isPolling && <span className="ml-2 text-yellow-400/60 animate-pulse">● syncing</span>}
+          </p>
         </div>
 
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
@@ -390,7 +396,13 @@ export default function AdminFleet() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
         {isLoading ? (
-          <div className="text-white/50">Loading fleet…</div>
+          Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="bg-zinc-800/60 border border-zinc-700 rounded-3xl p-6 space-y-4 animate-pulse">
+              <div className="h-10 bg-zinc-700 rounded-2xl w-1/2" />
+              <div className="h-6 bg-zinc-700 rounded-xl w-3/4" />
+              <div className="h-8 bg-zinc-700 rounded-xl" />
+            </div>
+          ))
         ) : (
           (fleetByHub || []).map((bus) => (
             <motion.div
