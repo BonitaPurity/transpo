@@ -171,6 +171,33 @@ async function initDb() {
     await store.init();
   }
   await store.ensureEntities(ENTITIES);
+
+  // ── Migrate JSON seed files into postgres on first boot ───────────────────
+  // If running in postgres mode and entities are empty, load from JSON files
+  if (store.mode === 'postgres') {
+    const dataDir = process.env.JSON_STORAGE_DIR
+      ? require('path').resolve(process.env.JSON_STORAGE_DIR)
+      : require('path').join(__dirname, '..', 'data');
+    const fs = require('fs');
+    const migrateEntities = ['hubs', 'buses', 'schedules', 'departures', 'bus_fares', 'pricing_routes', 'users', 'challenges', 'delivery_fees'];
+    for (const entity of migrateEntities) {
+      try {
+        const existing = await store.readAll(entity);
+        if (existing.length > 0) continue; // already has data, skip
+        const filePath = require('path').join(dataDir, `${entity}.json`);
+        if (!fs.existsSync(filePath)) continue;
+        const raw = fs.readFileSync(filePath, 'utf8');
+        const doc = JSON.parse(raw);
+        if (Array.isArray(doc.records) && doc.records.length > 0) {
+          await store.replaceAll(entity, doc.records);
+          console.log(`[Migrate] Loaded ${doc.records.length} ${entity} records from JSON into postgres`);
+        }
+      } catch (err) {
+        console.warn(`[Migrate] Could not migrate ${entity}:`, err.message);
+      }
+    }
+  }
+
   const seedDemo = process.env.JSON_SEED_DEMO_DATA === 'true';
   const seedBase = process.env.SEED_BASE_DATA === 'true' || seedDemo;
 
