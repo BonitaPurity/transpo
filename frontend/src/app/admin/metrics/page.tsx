@@ -77,6 +77,9 @@ export default function AdminMetrics() {
   const [liveStats, setLiveStats] = useState<MetricsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState<'csv' | 'pdf' | ''>('');
+  const [exportDateFrom, setExportDateFrom] = useState('');
+  const [exportDateTo, setExportDateTo] = useState('');
+  const [exportMonth, setExportMonth] = useState('');
 
 
 
@@ -110,7 +113,7 @@ export default function AdminMetrics() {
     if (!user?.email) return;
     setExporting(format);
     try {
-      await apiService.downloadMetrics(format);
+      await apiService.downloadMetrics(format, exportDateFrom, exportDateTo, exportMonth);
       notifySuccess(format === 'pdf' ? 'Ops Intelligence PDF downloaded.' : 'Ops Intelligence CSV downloaded.');
     } catch {
       notifyError(format === 'pdf' ? 'Failed to download Ops Intelligence PDF.' : 'Failed to download Ops Intelligence CSV.');
@@ -130,29 +133,77 @@ export default function AdminMetrics() {
 
   return (
     <div className="space-y-10 text-white">
-      <header className="flex flex-col md:flex-row items-baseline justify-between gap-6">
-        <div>
-          <h2 className="text-4xl font-black text-yellow-400 uppercase italic tracking-tighter">Ops Intelligence</h2>
-          <p className="text-white/40 text-sm font-bold mt-1">Live challenges, automated solutions, and network performance metrics.</p>
+      <header className="flex flex-col gap-4">
+        <div className="flex flex-col md:flex-row items-baseline justify-between gap-6">
+          <div>
+            <h2 className="text-4xl font-black text-yellow-400 uppercase italic tracking-tighter">Ops Intelligence</h2>
+            <p className="text-white/40 text-sm font-bold mt-1">Live challenges, automated solutions, and network performance metrics.</p>
+          </div>
+          <div className="flex items-center gap-3 flex-wrap">
+            <button 
+              onClick={() => handleExport('csv')}
+              disabled={!!exporting}
+              className="bg-black text-yellow-400 border-2 border-yellow-400/30 px-6 py-3 rounded-2xl flex items-center gap-3 font-black uppercase text-[10px] tracking-widest hover:bg-yellow-400 hover:text-black transition-all disabled:opacity-50 group hover:scale-105"
+            >
+              {exporting === 'csv' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4 group-hover:-translate-y-1 transition-transform" />}
+              Download Audit (CSV)
+            </button>
+            <button 
+              onClick={() => handleExport('pdf')}
+              disabled={!!exporting}
+              className="bg-black text-yellow-400 border-2 border-yellow-400/30 px-6 py-3 rounded-2xl flex items-center gap-3 font-black uppercase text-[10px] tracking-widest hover:bg-yellow-400 hover:text-black transition-all disabled:opacity-50 group hover:scale-105"
+            >
+              {exporting === 'pdf' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4 group-hover:-translate-y-1 transition-transform" />}
+              Download Audit (PDF)
+            </button>
+          </div>
         </div>
-        
-        <div className="flex items-center gap-3 flex-wrap">
-          <button 
-            onClick={() => handleExport('csv')}
-            disabled={!!exporting}
-            className="bg-black text-yellow-400 border-2 border-yellow-400/30 px-6 py-3 rounded-2xl flex items-center gap-3 font-black uppercase text-[10px] tracking-widest hover:bg-yellow-400 hover:text-black transition-all disabled:opacity-50 group hover:scale-105"
-          >
-            {exporting === 'csv' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4 group-hover:-translate-y-1 transition-transform" />}
-            Download Audit (CSV)
-          </button>
-          <button 
-            onClick={() => handleExport('pdf')}
-            disabled={!!exporting}
-            className="bg-black text-yellow-400 border-2 border-yellow-400/30 px-6 py-3 rounded-2xl flex items-center gap-3 font-black uppercase text-[10px] tracking-widest hover:bg-yellow-400 hover:text-black transition-all disabled:opacity-50 group hover:scale-105"
-          >
-            {exporting === 'pdf' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4 group-hover:-translate-y-1 transition-transform" />}
-            Download Audit (PDF)
-          </button>
+
+        {/* Date / Month filter for export */}
+        <div className="flex flex-wrap items-center gap-3 bg-zinc-800/40 border border-zinc-700 rounded-2xl px-5 py-4">
+          <span className="text-[10px] font-black uppercase tracking-widest text-white/30 shrink-0">Export period:</span>
+
+          <div className="flex items-center gap-2">
+            <label className="text-[10px] font-black uppercase text-white/40 shrink-0">Month</label>
+            <input
+              type="month"
+              value={exportMonth}
+              onChange={(e) => { setExportMonth(e.target.value); setExportDateFrom(''); setExportDateTo(''); }}
+              className="bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-sm font-bold text-white outline-none hover:border-yellow-400/40 transition-all"
+            />
+          </div>
+
+          <div className="text-white/20 font-black text-xs">or</div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <label className="text-[10px] font-black uppercase text-white/40 shrink-0">From</label>
+            <input
+              type="date"
+              value={exportDateFrom}
+              onChange={(e) => { setExportDateFrom(e.target.value); setExportMonth(''); }}
+              className="bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-sm font-bold text-white outline-none hover:border-yellow-400/40 transition-all"
+            />
+            <label className="text-[10px] font-black uppercase text-white/40 shrink-0">To</label>
+            <input
+              type="date"
+              value={exportDateTo}
+              onChange={(e) => { setExportDateTo(e.target.value); setExportMonth(''); }}
+              className="bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-sm font-bold text-white outline-none hover:border-yellow-400/40 transition-all"
+            />
+          </div>
+
+          {(exportMonth || exportDateFrom || exportDateTo) && (
+            <button
+              onClick={() => { setExportMonth(''); setExportDateFrom(''); setExportDateTo(''); }}
+              className="text-[10px] font-black uppercase text-red-400 hover:text-red-300 transition-colors px-3 py-2 rounded-xl border border-red-500/20 hover:border-red-500/40"
+            >
+              Clear
+            </button>
+          )}
+
+          <span className="text-[10px] font-bold text-white/30 ml-auto">
+            {exportMonth ? `Period: ${exportMonth}` : exportDateFrom ? `${exportDateFrom}${exportDateTo ? ` → ${exportDateTo}` : ''}` : 'All time (no filter)'}
+          </span>
         </div>
       </header>
 

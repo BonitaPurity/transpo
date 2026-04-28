@@ -1153,16 +1153,20 @@ app.post('/api/bookings', attachUserIfPresent, async (req, res) => {
 // 7. Bookings (List - Admin)
 app.get('/api/bookings', authenticateToken, withAsync(async (req, res) => {
   if (!requireAdmin(req, res)) return;
-  const { paymentStatus, search } = req.query;
-  const bookings = await db.getBookings({ paymentStatus, search });
+  const { paymentStatus, search, dateFrom, dateTo, month } = req.query;
+  const bookings = await db.getBookings({ paymentStatus, search, dateFrom, dateTo, month });
   res.json({ success: true, data: bookings });
 }));
 
 app.get('/api/admin/bookings/export', authenticateToken, withAsync(async (req, res) => {
   if (!requireAdmin(req, res)) return;
   const format = String(req.query.format || '').toLowerCase();
-  const { paymentStatus } = req.query;
-  const bookings = await db.getBookings(paymentStatus ? { paymentStatus } : undefined);
+  const { paymentStatus, dateFrom, dateTo, month } = req.query;
+  const bookings = await db.getBookings({ paymentStatus: paymentStatus || undefined, dateFrom, dateTo, month });
+
+  // Build filename with date range info
+  const dateKey = new Date().toISOString().split('T')[0];
+  const rangeLabel = month ? `_${month}` : (dateFrom && dateTo ? `_${dateFrom}_to_${dateTo}` : dateFrom ? `_from_${dateFrom}` : `_${dateKey}`);
 
   if (format === 'csv') {
     const headers = ['Pass ID', 'Passenger', 'Phone', 'Route', 'Bus Type', 'Date', 'Time', 'Status', 'Amount'];
@@ -1189,7 +1193,7 @@ app.get('/api/admin/bookings/export', authenticateToken, withAsync(async (req, r
     const csvContent = [headers.join(','), ...rows].join('\n');
     const dateKey = new Date().toISOString().split('T')[0];
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename=TRANSPO_BOOKINGS_${dateKey}.csv`);
+    res.setHeader('Content-Disposition', `attachment; filename=TRANSPO_BOOKINGS${rangeLabel}.csv`);
     return res.send(csvContent);
   }
 
@@ -1222,9 +1226,9 @@ app.get('/api/admin/bookings/export', authenticateToken, withAsync(async (req, r
       Number(b.totalAmount || 0).toLocaleString(),
     ]));
     return sendPdf(res, {
-      filename: `TRANSPO_BOOKINGS_${dateKey}.pdf`,
+      filename: `TRANSPO_BOOKINGS${rangeLabel}.pdf`,
       title: 'Bookings Export',
-      subtitle: `Total records: ${bookings.length}`,
+      subtitle: `Records: ${bookings.length}${month ? ` · Month: ${month}` : dateFrom ? ` · ${dateFrom}${dateTo ? ` to ${dateTo}` : ''}` : ''}`,
       columns,
       rows,
       lang,
@@ -1525,13 +1529,27 @@ app.get('/api/metrics/detailed', authenticateToken, async (req, res) => {
 app.get('/api/metrics/export', authenticateToken, async (req, res) => {
   if (!requireAdmin(req, res)) return;
   const format = String(req.query.format || '').toLowerCase();
+  const { dateFrom, dateTo, month } = req.query;
   const metrics = await db.getReportingMetrics();
   const stats = await db.getStats();
+  // Get filtered bookings for the period
+  const filteredBookings = await db.getBookings({
+    paymentStatus: 'Completed',
+    dateFrom: dateFrom || undefined,
+    dateTo: dateTo || undefined,
+    month: month || undefined,
+  });
+  const periodRevenue = filteredBookings.reduce((s, b) => s + (Number(b.totalAmount) || 0), 0);
+  const periodLabel = month ? `Month: ${month}` : (dateFrom ? `${dateFrom}${dateTo ? ` to ${dateTo}` : ''}` : 'All time');
   const dateKey = new Date().toISOString().split('T')[0];
+  const rangeLabel = month ? `_${month}` : (dateFrom ? `_${dateFrom}${dateTo ? `_to_${dateTo}` : ''}` : `_${dateKey}`);
 
   // Build flat rows: KPIs + challenges
   const kpiRows = [
     ["KPI", "Value", "Notes"],
+    ["Period",                 periodLabel,                    "Selected filter period"],
+    ["Period Bookings",        String(filteredBookings.length), `Completed bookings for ${periodLabel}`],
+    ["Period Revenue",         `UGX ${periodRevenue.toLocaleString()}`, `Ticket revenue for ${periodLabel}`],
     ["Today's Bookings",       String(metrics.todayBookings),  "Bookings created today"],
     ["Today's Revenue",        `UGX ${Number(metrics.todayRevenue).toLocaleString()}`, "Completed ticket payments today"],
     ["Today's Delivery Fees",  `UGX ${Number(metrics.todayDeliveryRevenue || 0).toLocaleString()}`, "Completed delivery payments today"],
@@ -1560,7 +1578,7 @@ app.get('/api/metrics/export', authenticateToken, async (req, res) => {
     const allRows = [...kpiRows, ...challengeRows];
     const csvContent = allRows.map(r => r.map(v => `"${String(v || '').replace(/"/g, '""')}"`).join(',')).join('\n');
     res.setHeader('Content-Type', 'text/csv');
-    res.setHeader('Content-Disposition', `attachment; filename=TRANSPO_OPS_INTELLIGENCE_${dateKey}.csv`);
+    res.setHeader('Content-Disposition', `attachment; filename=TRANSPO_OPS_INTELLIGENCE${rangeLabel}.csv`);
     return res.send(csvContent);
   }
 
@@ -1575,6 +1593,9 @@ app.get('/api/metrics/export', authenticateToken, async (req, res) => {
     ];
     // KPI summary rows first
     const kpiPdfRows = [
+      ["Period",                 periodLabel, '-', '-', 'Selected filter period'],
+      ["Period Bookings",        String(filteredBookings.length), '-', '-', `Completed bookings for ${periodLabel}`],
+      ["Period Revenue",         `UGX ${periodRevenue.toLocaleString()}`, '-', '-', `Revenue for ${periodLabel}`],
       ["Today's Bookings",       metrics.todayBookings,  '-', '-', 'Bookings created today'],
       ["Today's Revenue",        `UGX ${Number(metrics.todayRevenue).toLocaleString()}`, '-', '-', 'Completed ticket payments today'],
       ["Today's Delivery Fees",  `UGX ${Number(metrics.todayDeliveryRevenue || 0).toLocaleString()}`, '-', '-', 'Completed delivery payments today'],
@@ -1587,9 +1608,9 @@ app.get('/api/metrics/export', authenticateToken, async (req, res) => {
       c.title, c.severity, c.status, c.metric, c.solution,
     ]);
     return sendPdf(res, {
-      filename: `TRANSPO_OPS_INTELLIGENCE_${dateKey}.pdf`,
+      filename: `TRANSPO_OPS_INTELLIGENCE${rangeLabel}.pdf`,
       title: 'Ops Intelligence Report',
-      subtitle: `Generated: ${dateKey} · Challenges: ${(metrics.challenges || []).length} · On-Time: ${metrics.onTimeRate}`,
+      subtitle: `Period: ${periodLabel} · Challenges: ${(metrics.challenges || []).length} · On-Time: ${metrics.onTimeRate}`,
       columns,
       rows: [...kpiPdfRows, ...challengePdfRows],
       lang,

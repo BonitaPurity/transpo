@@ -1215,7 +1215,7 @@ async function findBookingByUserAndSchedule(userId, scheduleId, travelDate) {
   ) || null;
 }
 
-async function getBookings({ paymentStatus, search } = {}) {
+async function getBookings({ paymentStatus, search, dateFrom, dateTo, month } = {}) {
   const [bookings, schedules, users, departures, buses] = await Promise.all([
     store.readAll('bookings'),
     store.readAll('schedules'),
@@ -1232,6 +1232,17 @@ async function getBookings({ paymentStatus, search } = {}) {
   let filtered = bookings;
   if (paymentStatus) {
     filtered = filtered.filter((b) => String(b.paymentStatus) === String(paymentStatus));
+  }
+  // Filter by specific date range (dateFrom / dateTo based on travelDate)
+  if (dateFrom) {
+    filtered = filtered.filter((b) => String(b.travelDate || '') >= String(dateFrom));
+  }
+  if (dateTo) {
+    filtered = filtered.filter((b) => String(b.travelDate || '') <= String(dateTo));
+  }
+  // Filter by month (YYYY-MM format, matches travelDate prefix)
+  if (month) {
+    filtered = filtered.filter((b) => String(b.travelDate || '').startsWith(String(month)));
   }
 
   const result = filtered.map((b) => {

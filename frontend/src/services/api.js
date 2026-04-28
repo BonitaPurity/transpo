@@ -396,6 +396,9 @@ export const apiService = {
     const q = new URLSearchParams();
     if (params.paymentStatus) q.append('paymentStatus', params.paymentStatus);
     if (params.search) q.append('search', params.search);
+    if (params.dateFrom) q.append('dateFrom', params.dateFrom);
+    if (params.dateTo) q.append('dateTo', params.dateTo);
+    if (params.month) q.append('month', params.month);
     const query = q.toString() ? `?${q.toString()}` : '';
     return request(`/bookings${query}`);
   },
@@ -569,17 +572,23 @@ export const apiService = {
     return downloadBlobFromPath(`/admin/manifest/export?format=${encodeURIComponent(ext)}`, `TRANSPO_AUDIT_${dateKey}.${ext}`);
   },
 
-  async downloadMetrics(format = 'csv') {
-    const dateKey = new Date().toISOString().split('T')[0];
+  async downloadMetrics(format = 'csv', dateFrom = '', dateTo = '', month = '') {
     const ext = String(format).toLowerCase() === 'pdf' ? 'pdf' : 'csv';
-    return downloadBlobFromPath(`/metrics/export?format=${encodeURIComponent(ext)}`, `TRANSPO_OPS_INTELLIGENCE_${dateKey}.${ext}`);
+    const q = new URLSearchParams({ format: ext });
+    if (month) q.append('month', month);
+    else if (dateFrom) { q.append('dateFrom', dateFrom); if (dateTo) q.append('dateTo', dateTo); }
+    const label = month ? `_${month}` : (dateFrom ? `_${dateFrom}${dateTo ? `_to_${dateTo}` : ''}` : `_${new Date().toISOString().split('T')[0]}`);
+    return downloadBlobFromPath(`/metrics/export?${q.toString()}`, `TRANSPO_OPS_INTELLIGENCE${label}.${ext}`);
   },
 
-  async downloadAdminBookingsExport(format = 'csv', paymentStatus = 'Completed') {
-    const dateKey = new Date().toISOString().split('T')[0];
+  async downloadAdminBookingsExport(format = 'csv', paymentStatus = 'Completed', dateFrom = '', dateTo = '', month = '') {
     const ext = String(format).toLowerCase() === 'pdf' ? 'pdf' : 'csv';
-    const ps = paymentStatus ? `&paymentStatus=${encodeURIComponent(paymentStatus)}` : '';
-    return downloadBlobFromPath(`/admin/bookings/export?format=${encodeURIComponent(ext)}${ps}`, `TRANSPO_BOOKINGS_${dateKey}.${ext}`);
+    const q = new URLSearchParams({ format: ext });
+    if (paymentStatus) q.append('paymentStatus', paymentStatus);
+    if (month) q.append('month', month);
+    else if (dateFrom) { q.append('dateFrom', dateFrom); if (dateTo) q.append('dateTo', dateTo); }
+    const label = month ? `_${month}` : (dateFrom ? `_${dateFrom}${dateTo ? `_to_${dateTo}` : ''}` : `_${new Date().toISOString().split('T')[0]}`);
+    return downloadBlobFromPath(`/admin/bookings/export?${q.toString()}`, `TRANSPO_BOOKINGS${label}.${ext}`);
   },
 
   async downloadUserBookingsExport(userId, format = 'csv') {

@@ -31,13 +31,16 @@ export default function AdminBookings() {
   const [exporting, setExporting] = useState<'csv' | 'pdf' | ''>('');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('Completed');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [month, setMonth] = useState('');
   const [error, setError] = useState('');
 
   const handleExport = async (format: 'csv' | 'pdf') => {
     if (!user?.email) return;
     setExporting(format);
     try {
-      await apiService.downloadAdminBookingsExport(format, statusFilter);
+      await apiService.downloadAdminBookingsExport(format, statusFilter, dateFrom, dateTo, month);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       console.error('Export failed', err);
@@ -54,7 +57,10 @@ export default function AdminBookings() {
     try {
       const res = await apiService.getBookings({ 
         paymentStatus: statusFilter === 'All' ? undefined : statusFilter, 
-        search 
+        search,
+        dateFrom: dateFrom || undefined,
+        dateTo: dateTo || undefined,
+        month: month || undefined,
       });
       if (res.success) {
         setBookings(res.data);
@@ -74,56 +80,110 @@ export default function AdminBookings() {
       loadBookings();
     }, 400);
     return () => clearTimeout(timer);
-  }, [user, search, statusFilter]);
+  }, [user, search, statusFilter, dateFrom, dateTo, month]);
 
   return (
     <div className="space-y-8 text-white">
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-4xl font-black text-yellow-400 uppercase italic tracking-tighter">Booking Manifest</h2>
-          <p className="text-white/40 text-sm font-bold mt-1">All passenger tickets across every regional hub.</p>
+      <header className="flex flex-col gap-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h2 className="text-4xl font-black text-yellow-400 uppercase italic tracking-tighter">Booking Manifest</h2>
+            <p className="text-white/40 text-sm font-bold mt-1">All passenger tickets across every regional hub.</p>
+          </div>
+          <div className="flex items-center flex-wrap gap-3">
+            <div className="bg-zinc-800 border border-zinc-700 px-5 py-3 rounded-2xl flex items-center gap-2 min-h-11">
+              <Search className="w-4 h-4 text-white/30 shrink-0" />
+              <input 
+                type="text" 
+                placeholder="Search..." 
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="bg-transparent text-sm font-bold outline-none text-white placeholder:text-white/20 w-40 sm:w-48" 
+              />
+            </div>
+            <select 
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="bg-zinc-800 border border-zinc-700 px-4 py-3 rounded-2xl text-sm font-bold outline-none text-white appearance-none cursor-pointer hover:border-yellow-400/40 transition-all min-h-11"
+            >
+              <option value="All">All Status</option>
+              <option value="Completed">Completed</option>
+              <option value="Pending">Pending</option>
+              <option value="Cancelled">Cancelled</option>
+            </select>
+            <button
+              onClick={() => handleExport('csv')}
+              disabled={!!exporting || bookings.length === 0}
+              className={`px-4 py-3 rounded-2xl transition-all font-black uppercase text-xs tracking-widest flex items-center gap-2 min-h-11 whitespace-nowrap ${
+                exporting === 'csv' ? 'bg-zinc-700 text-white' : 'bg-yellow-400 hover:scale-105 active:scale-95 text-black'
+              }`}
+            >
+              {exporting === 'csv' ? <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" /> : <Download className="w-4 h-4" />}
+              CSV
+            </button>
+            <button
+              onClick={() => handleExport('pdf')}
+              disabled={!!exporting || bookings.length === 0}
+              className={`px-4 py-3 rounded-2xl transition-all font-black uppercase text-xs tracking-widest flex items-center gap-2 min-h-11 whitespace-nowrap ${
+                exporting === 'pdf' ? 'bg-zinc-700 text-white' : 'bg-yellow-400 hover:scale-105 active:scale-95 text-black'
+              }`}
+            >
+              {exporting === 'pdf' ? <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" /> : <Download className="w-4 h-4" />}
+              PDF
+            </button>
+          </div>
         </div>
-        <div className="flex items-center flex-wrap gap-3">
-          <div className="bg-zinc-800 border border-zinc-700 px-5 py-3 rounded-2xl flex items-center gap-2 min-h-11">
-            <Search className="w-4 h-4 text-white/30 shrink-0" />
-            <input 
-              type="text" 
-              placeholder="Search..." 
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="bg-transparent text-sm font-bold outline-none text-white placeholder:text-white/20 w-40 sm:w-48" 
+
+        {/* Date / Month filters */}
+        <div className="flex flex-wrap items-center gap-3 bg-zinc-800/40 border border-zinc-700 rounded-2xl px-5 py-4">
+          <span className="text-[10px] font-black uppercase tracking-widest text-white/30 shrink-0">Filter by:</span>
+
+          {/* Month picker */}
+          <div className="flex items-center gap-2">
+            <label className="text-[10px] font-black uppercase text-white/40 shrink-0">Month</label>
+            <input
+              type="month"
+              value={month}
+              onChange={(e) => { setMonth(e.target.value); setDateFrom(''); setDateTo(''); }}
+              className="bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-sm font-bold text-white outline-none hover:border-yellow-400/40 transition-all"
             />
           </div>
-          <select 
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="bg-zinc-800 border border-zinc-700 px-4 py-3 rounded-2xl text-sm font-bold outline-none text-white appearance-none cursor-pointer hover:border-yellow-400/40 transition-all min-h-11"
-          >
-            <option value="All">All Status</option>
-            <option value="Completed">Completed</option>
-            <option value="Pending">Pending</option>
-            <option value="Cancelled">Cancelled</option>
-          </select>
-          <button
-            onClick={() => handleExport('csv')}
-            disabled={!!exporting || bookings.length === 0}
-            className={`px-4 py-3 rounded-2xl transition-all font-black uppercase text-xs tracking-widest flex items-center gap-2 min-h-11 whitespace-nowrap ${
-              exporting === 'csv' ? 'bg-zinc-700 text-white' : 'bg-yellow-400 hover:scale-105 active:scale-95 text-black'
-            }`}
-          >
-            {exporting === 'csv' ? <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" /> : <Download className="w-4 h-4" />}
-            CSV
-          </button>
-          <button
-            onClick={() => handleExport('pdf')}
-            disabled={!!exporting || bookings.length === 0}
-            className={`px-4 py-3 rounded-2xl transition-all font-black uppercase text-xs tracking-widest flex items-center gap-2 min-h-11 whitespace-nowrap ${
-              exporting === 'pdf' ? 'bg-zinc-700 text-white' : 'bg-yellow-400 hover:scale-105 active:scale-95 text-black'
-            }`}
-          >
-            {exporting === 'pdf' ? <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" /> : <Download className="w-4 h-4" />}
-            PDF
-          </button>
+
+          <div className="text-white/20 font-black text-xs">or</div>
+
+          {/* Date range */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <label className="text-[10px] font-black uppercase text-white/40 shrink-0">From</label>
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => { setDateFrom(e.target.value); setMonth(''); }}
+              className="bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-sm font-bold text-white outline-none hover:border-yellow-400/40 transition-all"
+            />
+            <label className="text-[10px] font-black uppercase text-white/40 shrink-0">To</label>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => { setDateTo(e.target.value); setMonth(''); }}
+              className="bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-sm font-bold text-white outline-none hover:border-yellow-400/40 transition-all"
+            />
+          </div>
+
+          {(month || dateFrom || dateTo) && (
+            <button
+              onClick={() => { setMonth(''); setDateFrom(''); setDateTo(''); }}
+              className="text-[10px] font-black uppercase text-red-400 hover:text-red-300 transition-colors px-3 py-2 rounded-xl border border-red-500/20 hover:border-red-500/40"
+            >
+              Clear
+            </button>
+          )}
+
+          {(month || dateFrom) && (
+            <span className="text-[10px] font-bold text-yellow-400/60 ml-auto">
+              {month ? `Showing: ${month}` : `${dateFrom}${dateTo ? ` → ${dateTo}` : ''}`}
+              {' · '}{bookings.length} records
+            </span>
+          )}
         </div>
       </header>
 
