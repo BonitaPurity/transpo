@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Phone, Mail, ShieldCheck, Activity } from 'lucide-react';
+import { Phone, Mail, ShieldCheck, Activity, Search, X } from 'lucide-react';
 import { apiService } from '@/services/api';
 
 interface AdminUserRow {
@@ -50,6 +50,8 @@ export default function AdminUsers() {
   const [users, setUsers] = useState<AdminUserRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [search, setSearch] = useState('');
+  const [roleFilter, setRoleFilter] = useState<'all' | 'user' | 'admin'>('all');
   const [passwordUser, setPasswordUser] = useState<AdminUserRow | null>(null);
   const [newPassword, setNewPassword] = useState('');
   const [passwordMsg, setPasswordMsg] = useState('');
@@ -78,6 +80,22 @@ export default function AdminUsers() {
   }, []);
 
   const totalAccesses = useMemo(() => users.reduce((s, u) => s + (u.accessCount || 0), 0), [users]);
+
+  const filteredUsers = useMemo(() => {
+    let result = users;
+    if (roleFilter !== 'all') {
+      result = result.filter(u => u.role === roleFilter);
+    }
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      result = result.filter(u =>
+        u.name.toLowerCase().includes(q) ||
+        u.email.toLowerCase().includes(q) ||
+        (u.phone && u.phone.toLowerCase().includes(q))
+      );
+    }
+    return result;
+  }, [users, search, roleFilter]);
   const formatDate = (iso?: string | null) => {
     if (!iso) return '—';
     const d = new Date(iso);
@@ -87,11 +105,65 @@ export default function AdminUsers() {
 
   return (
     <div className="space-y-8 text-white">
-      <header>
-        <h2 className="text-4xl font-black text-yellow-400 uppercase italic tracking-tighter">User Registry</h2>
-        <p className="text-white/40 text-sm font-bold mt-1">
-          {users.length} registered users · {totalAccesses.toLocaleString()} total system accesses.
-        </p>
+      <header className="space-y-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h2 className="text-4xl font-black text-yellow-400 uppercase italic tracking-tighter">User Registry</h2>
+            <p className="text-white/40 text-sm font-bold mt-1">
+              {users.length} registered users · {totalAccesses.toLocaleString()} total system accesses
+              {filteredUsers.length !== users.length && (
+                <span className="text-yellow-400/60"> · {filteredUsers.length} matching</span>
+              )}
+            </p>
+          </div>
+        </div>
+
+        {/* Search + filter bar */}
+        <div className="flex flex-wrap items-center gap-3 bg-zinc-800/40 border border-zinc-700 rounded-2xl px-5 py-4">
+          {/* Search input */}
+          <div className="flex items-center gap-2 bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 flex-1 min-w-[200px] max-w-sm">
+            <Search className="w-4 h-4 text-white/30 shrink-0" />
+            <input
+              type="text"
+              placeholder="Search by name, email or phone..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="bg-transparent text-sm font-bold outline-none text-white placeholder:text-white/20 w-full"
+            />
+            {search && (
+              <button onClick={() => setSearch('')} className="text-white/30 hover:text-white transition-colors">
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+
+          {/* Role filter */}
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-black uppercase text-white/30 shrink-0">Role:</span>
+            {(['all', 'user', 'admin'] as const).map(r => (
+              <button
+                key={r}
+                onClick={() => setRoleFilter(r)}
+                className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                  roleFilter === r
+                    ? 'bg-yellow-400 text-black'
+                    : 'bg-zinc-800 text-white/40 border border-zinc-700 hover:border-yellow-400/30'
+                }`}
+              >
+                {r === 'all' ? 'All' : r === 'admin' ? 'Admins' : 'Passengers'}
+              </button>
+            ))}
+          </div>
+
+          {(search || roleFilter !== 'all') && (
+            <button
+              onClick={() => { setSearch(''); setRoleFilter('all'); }}
+              className="text-[10px] font-black uppercase text-red-400 hover:text-red-300 px-3 py-2 rounded-xl border border-red-500/20 hover:border-red-500/40 transition-colors ml-auto"
+            >
+              Clear filters
+            </button>
+          )}
+        </div>
       </header>
 
       {error && (
@@ -107,7 +179,22 @@ export default function AdminUsers() {
       )}
 
       <div className="grid grid-cols-1 gap-4">
-        {!loading && users.map((u, i) => (
+        {!loading && filteredUsers.length === 0 && !error && (
+          <div className="bg-zinc-800/40 border border-zinc-700 rounded-2xl px-8 py-12 text-center">
+            <div className="text-white/20 font-black uppercase tracking-widest text-sm">
+              {search || roleFilter !== 'all' ? 'No users match your search' : 'No users registered yet'}
+            </div>
+            {(search || roleFilter !== 'all') && (
+              <button
+                onClick={() => { setSearch(''); setRoleFilter('all'); }}
+                className="mt-4 text-yellow-400/60 hover:text-yellow-400 font-black text-xs uppercase tracking-widest transition-colors"
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
+        )}
+        {!loading && filteredUsers.map((u, i) => (
           <motion.div
             key={u.email}
             initial={{ opacity: 0, y: 10 }}
