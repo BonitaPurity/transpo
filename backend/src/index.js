@@ -2357,6 +2357,8 @@ async function startSimulation() {
       
       // Process bus positions sequentially to handle async awaits properly
       for (const bus of buses) {
+        // Skip buses that don't need position updates to reduce DB load
+        if (bus.status === 'Maintenance' || bus.status === 'Deleted') continue;
         // Track the latest position/battery/speed so telemetry is never stale
         let telemetrySnapshot = {
           battery: bus.battery,

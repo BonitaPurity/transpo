@@ -146,7 +146,7 @@ class PgStore {
     return r.rows[0].doc;
   }
 
-  async _writeEntityUnsafe(entity, doc) {
+  async _writeEntityUnsafe(entity, doc, { backup = true } = {}) {
     const c = this._tx();
     const nextDoc = {
       meta: {
@@ -158,7 +158,11 @@ class PgStore {
       records: doc.records || [],
     };
 
-    await this.createBackupUnsafe(entity);
+    // Skip backups for high-frequency simulation entities to reduce DB load
+    const highFrequencyEntities = ['buses', 'telemetry_logs', 'system_alerts'];
+    if (backup && !highFrequencyEntities.includes(entity)) {
+      await this.createBackupUnsafe(entity);
+    }
     await c.query(
       `
       INSERT INTO entity_docs(entity, doc, updated_at)
