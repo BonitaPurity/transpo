@@ -2345,7 +2345,7 @@ async function autoMarkArrivedDeliveriesForBus({ busId, gpsLat, gpsLng, destinat
 // Postgres free tier (Render) has limited connections — use 5s to avoid exhausting the pool.
 const SIM_INTERVAL_MS = process.env.SIM_INTERVAL_MS
   ? Math.max(500, Number(process.env.SIM_INTERVAL_MS))
-  : (db.getDbMode() === 'postgres' ? 5000 : 4000);
+  : (db.getDbMode() === 'postgres' ? 10000 : 4000);
 
 async function startSimulation() {
   let stopped = false;
@@ -2493,13 +2493,15 @@ async function startSimulation() {
           }
         }
 
-        // Log and emit using the up-to-date snapshot, not the stale loop variable
-        await db.logTelemetry(bus.id, {
-          battery: telemetrySnapshot.battery,
-          speed: telemetrySnapshot.speed,
-          gpsLat: telemetrySnapshot.gpsLat,
-          gpsLng: telemetrySnapshot.gpsLng,
-        });
+        // Log telemetry only in JSON mode — postgres free tier has limited connections
+        if (db.getDbMode() !== 'postgres') {
+          await db.logTelemetry(bus.id, {
+            battery: telemetrySnapshot.battery,
+            speed: telemetrySnapshot.speed,
+            gpsLat: telemetrySnapshot.gpsLat,
+            gpsLng: telemetrySnapshot.gpsLng,
+          });
+        }
 
         io.emit('telemetry_update', {
           busId: bus.id,
