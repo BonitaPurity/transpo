@@ -132,7 +132,7 @@ export default function Dashboard() {
       try {
         const hubsRes = await apiService.getHubs();
         if (hubsRes.success) setHubs(hubsRes.data || []);
-        const depRes = await apiService.getDepartures({ startDate: selectedDate, includePast: true });
+        const depRes = await apiService.getDepartures({ startDate: selectedDate });
         if (depRes.success) setDepartures(depRes.data || []);
         const arrRes = await apiService.getArrivals({ startDate: selectedDate });
         if (arrRes.success) setArrivals(arrRes.data || []);
@@ -149,7 +149,7 @@ export default function Dashboard() {
   useEffect(() => {
     const interval = setInterval(async () => {
       try {
-        const depRes = await apiService.getDepartures({ hubId: selectedHub?.id, startDate: selectedDate, includePast: true });
+        const depRes = await apiService.getDepartures({ hubId: selectedHub?.id, startDate: selectedDate });
         if (depRes?.success) setDepartures(depRes.data || []);
         const arrRes = await apiService.getArrivals({ hubId: selectedHub?.id, startDate: selectedDate });
         if (arrRes?.success) setArrivals(arrRes.data || []);
@@ -165,7 +165,7 @@ export default function Dashboard() {
     setSelectedHub(hub);
     setLoading(true);
     try {
-      const res = await apiService.getDepartures({ hubId: hub?.id, startDate: selectedDate, includePast: true });
+      const res = await apiService.getDepartures({ hubId: hub?.id, startDate: selectedDate });
       if (res.success) {
         setDepartures(res.data || []);
         setApiError('');
@@ -747,3 +747,4 @@ export default function Dashboard() {
     </div>
   );
 }
+
